@@ -1830,13 +1830,15 @@ def create_roro_sheet(wb: Workbook):
         )
         ws.cell(row=row, column=6).font = styles["normal_font"]
         ws.cell(row=row, column=6).number_format = number_format
-        # FWD_precise_m (column 7) - v4.0: Trim_m은 F/100 사용 (Trim_cm이 이제 column 6)
-        # 임시 수식, extend_precision_columns에서 LCF 기반 정밀 계산으로 덮어씀
-        ws.cell(row=row, column=7).value = f'=IF(F{row_str}="", "", F{row_str} / 100)'
+        # FWD_precise_m / AFT_precise_m: Trim_cm(F)을 m로 변환 후 전/후 흘수 산출
+        ws.cell(row=row, column=7).value = (
+            f'=IF($A{row_str}="","",$B$6 + (F{row_str}/100)/2)'
+        )
         ws.cell(row=row, column=7).font = styles["normal_font"]
         ws.cell(row=row, column=7).number_format = number_format
-        # AFT_precise_m (column 8) - v4.0: 임시 수식, extend_precision_columns에서 덮어씀
-        ws.cell(row=row, column=8).value = f'=IF(F{row_str}="", "", F{row_str} / 100)'
+        ws.cell(row=row, column=8).value = (
+            f'=IF($A{row_str}="","",$B$6 - (F{row_str}/100)/2)'
+        )
         ws.cell(row=row, column=8).font = styles["normal_font"]
         ws.cell(row=row, column=8).number_format = number_format
 
@@ -1897,14 +1899,12 @@ def create_roro_sheet(wb: Workbook):
         ws.cell(row=row, column=15).value = (
             f'=IF(F{row_str}="", "", IF(ABS(F{row_str}/100) <= ($B$15/50), "OK", "EXCESSIVE"))'
         )
-        # O (15): Dfwd_m - FWD_precise_m 참조 (LCF 기반 정밀 계산 결과 사용)
-        # extend_precision_columns에서 계산된 FWD_precise_m (Column 7 = G) 참조
-        ws.cell(row=row, column=16).value = f'=IF(G{row_str}="", "", G{row_str})'
+        # O (15): Dfwd_m - FWD_precise_m 그대로 참조
+        ws.cell(row=row, column=16).value = f'=IF($A{row_str}="","",G{row_str})'
         ws.cell(row=row, column=16).font = styles["normal_font"]
         ws.cell(row=row, column=16).number_format = number_format
-        # P (16): Daft_m - AFT_precise_m 참조 (LCF 기반 정밀 계산 결과 사용)
-        # extend_precision_columns에서 계산된 AFT_precise_m (Column 8 = H) 참조
-        ws.cell(row=row, column=17).value = f'=IF(H{row_str}="", "", H{row_str})'
+        # P (16): Daft_m - AFT_precise_m 그대로 참조
+        ws.cell(row=row, column=17).value = f'=IF($A{row_str}="","",H{row_str})'
         ws.cell(row=row, column=17).font = styles["normal_font"]
         ws.cell(row=row, column=17).number_format = number_format
         # Q (17): Trim_target_stage_cm - Stage별 타깃, 없으면 전역(B8) 사용
@@ -1996,24 +1996,18 @@ def create_roro_sheet(wb: Workbook):
         c.font = styles["normal_font"]
         c.number_format = number_format
 
-        # G: FWD_precise_m - LCF 기반 정밀 Forward Draft (일반 Stage와 동일한 수식)
-        # MD 파일 공식: Dfwd = Tmean - Trim_m * (1 - LCF/LBP)
-        # Tmean = Baseline draft ($B$6), Trim_m = F/100 (Column 6 = Trim_cm)
+        # G: FWD_precise_m - Trim_cm(F)을 m로 변환 후 전흘수 산출
         c = ws.cell(row=mass_opt_row, column=7)
         c.value = (
-            f'=IF($A{mass_opt_row_str}="", "", '
-            f"$B$6 - (F{mass_opt_row_str}/100) * (0.5 - Calc!$E$41 / Calc!$E$40))"
+            f'=IF($A{mass_opt_row_str}="","",$B$6 + (F{mass_opt_row_str}/100)/2)'
         )
         c.font = styles["normal_font"]
         c.number_format = number_format
 
-        # H: AFT_precise_m - LCF 기반 정밀 Aft Draft (일반 Stage와 동일한 수식)
-        # MD 파일 공식: Daft = Tmean + Trim_m * (LCF/LBP)
-        # Tmean = Baseline draft ($B$6), Trim_m = F/100 (Column 6 = Trim_cm)
+        # H: AFT_precise_m - Trim_cm(F)을 m로 변환 후 선미흘수 산출
         c = ws.cell(row=mass_opt_row, column=8)
         c.value = (
-            f'=IF($A{mass_opt_row_str}="", "", '
-            f"$B$6 + (F{mass_opt_row_str}/100) * (Calc!$E$41 / Calc!$E$40 + 0.5))"
+            f'=IF($A{mass_opt_row_str}="","",$B$6 - (F{mass_opt_row_str}/100)/2)'
         )
         c.font = styles["normal_font"]
         c.number_format = number_format
@@ -2063,15 +2057,15 @@ def create_roro_sheet(wb: Workbook):
         c.value = f'=IF(F{mass_opt_row_str}="", "", IF(ABS(F{mass_opt_row_str}/100) <= ($B$15/50), "OK", "EXCESSIVE"))'
         c.font = styles["normal_font"]
 
-        # P: Dfwd_m - FWD_precise_m 참조 (LCF 기반 정밀 계산 결과 사용)
+        # P: Dfwd_m - FWD_precise_m 참조
         c = ws.cell(row=mass_opt_row, column=16)
-        c.value = f'=IF(G{mass_opt_row_str}="", "", G{mass_opt_row_str})'
+        c.value = f'=IF($A{mass_opt_row_str}="","",G{mass_opt_row_str})'
         c.font = styles["normal_font"]
         c.number_format = number_format
 
-        # Q: Daft_m - AFT_precise_m 참조 (LCF 기반 정밀 계산 결과 사용)
+        # Q: Daft_m - AFT_precise_m 참조
         c = ws.cell(row=mass_opt_row, column=17)
-        c.value = f'=IF(H{mass_opt_row_str}="", "", H{mass_opt_row_str})'
+        c.value = f'=IF($A{mass_opt_row_str}="","",H{mass_opt_row_str})'
         c.font = styles["normal_font"]
         c.number_format = number_format
 
@@ -2969,27 +2963,16 @@ def extend_precision_columns(ws, first_data_row, num_stages):
     for row in range(first_data_row, first_data_row + num_stages):
         row_str = str(row)
 
-        # G (7): FWD_precise_m - LCF 기반 정밀 Forward Draft
-        # MD 파일 공식: Dfwd = Tmean - Trim_m * (1 - LCF/LBP)
-        # Tmean = Baseline draft ($B$6), Trim_m = F/100 (Column 6 = Trim_cm)
-        # Note: MD 파일의 LCF는 F.P. 기준, Calc!$E$41은 LCF_from_mid_m (midship 기준)
-        # 좌표계 변환: LCF_from_FP = LCF_from_mid_m + LBP/2
-        # r = LCF_from_FP / LBP = (LCF_from_mid_m + LBP/2) / LBP = LCF_from_mid_m/LBP + 1/2
-        # F: 1 - r = 1 - (LCF_from_mid_m/LBP + 1/2) = 1/2 - LCF_from_mid_m/LBP
+        # G (7): FWD_precise_m - Trim_cm(F)을 m로 변환 후 전흘수 산출
         ws.cell(row=row, column=7).value = (
-            f'=IF($A{row_str}="", "", '
-            f"$B$6 - (F{row_str}/100) * (0.5 - Calc!$E$41 / Calc!$E$40))"
+            f'=IF($A{row_str}="","",$B$6 + (F{row_str}/100)/2)'
         )
         ws.cell(row=row, column=7).number_format = number_format
         ws.cell(row=row, column=7).font = styles["normal_font"]
 
-        # H (8): AFT_precise_m - LCF 기반 정밀 Aft Draft
-        # MD 파일 공식: Daft = Tmean + Trim_m * (LCF/LBP)
-        # Tmean = Baseline draft ($B$6), Trim_m = F/100 (Column 6 = Trim_cm)
-        # r = LCF_from_FP / LBP = LCF_from_mid_m/LBP + 1/2
+        # H (8): AFT_precise_m - Trim_cm(F)을 m로 변환 후 선미흘수 산출
         ws.cell(row=row, column=8).value = (
-            f'=IF($A{row_str}="", "", '
-            f"$B$6 + (F{row_str}/100) * (Calc!$E$41 / Calc!$E$40 + 0.5))"
+            f'=IF($A{row_str}="","",$B$6 - (F{row_str}/100)/2)'
         )
         ws.cell(row=row, column=8).number_format = number_format
         ws.cell(row=row, column=8).font = styles["normal_font"]
