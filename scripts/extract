@@ -1,0 +1,271 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+"""
+PDF 문서에서 LCT Bushra의 D-vessel (molded depth) 값 추출 스크립트
+
+이 스크립트는 [HVDC]AGI TRANSFORMER 폴더의 PDF 문서들을 분석하여
+선박 깊이(molded depth, vessel depth) 값을 추출합니다.
+"""
+
+import os
+import re
+from pathlib import Path
+from typing import Dict, List, Tuple, Optional
+
+try:
+    import pdfplumber
+    PDF_PARSER = "pdfplumber"
+except ImportError:
+    try:
+        import PyPDF2
+        PDF_PARSER = "PyPDF2"
+    except ImportError:
+        PDF_PARSER = None
+        print("ERROR: Neither pdfplumber nor PyPDF2 is installed.")
+        print("Please install one of them:")
+        print("  pip install pdfplumber")
+        print("  or")
+        print("  pip install PyPDF2")
+        exit(1)
+
+
+def extract_text_with_pdfplumber(pdf_path: Path) -> List[Tuple[int, str]]:
+    """pdfplumber를 사용하여 PDF에서 텍스트 추출"""
+    pages_text = []
+    try:
+        with pdfplumber.open(pdf_path) as pdf:
+            for page_num, page in enumerate(pdf.pages, start=1):
+                text = page.extract_text()
+                if text:
+                    pages_text.append((page_num, text))
+    except Exception as e:
+        print(f"Error extracting text from {pdf_path.name}: {e}")
+    return pages_text
+
+
+def extract_text_with_pypdf2(pdf_path: Path) -> List[Tuple[int, str]]:
+    """PyPDF2를 사용하여 PDF에서 텍스트 추출"""
+    pages_text = []
+    try:
+        with open(pdf_path, 'rb') as file:
+            pdf_reader = PyPDF2.PdfReader(file)
+            for page_num, page in enumerate(pdf_reader.pages, start=1):
+                text = page.extract_text()
+                if text:
+                    pages_text.append((page_num, text))
+    except Exception as e:
+        print(f"Error extracting text from {pdf_path.name}: {e}")
+    return pages_text
+
+
+def extract_text_from_pdf(pdf_path: Path) -> List[Tuple[int, str]]:
+    """PDF에서 텍스트 추출 (사용 가능한 파서 사용)"""
+    if PDF_PARSER == "pdfplumber":
+        return extract_text_with_pdfplumber(pdf_path)
+    elif PDF_PARSER == "PyPDF2":
+        return extract_text_with_pypdf2(pdf_path)
+    else:
+        return []
+
+
+def search_depth_values(text: str, page_num: int) -> List[Dict]:
+    """텍스트에서 선박 깊이 관련 값 검색"""
+    findings = []
+    
+    # 패턴 1: "molded depth" 또는 "vessel depth" 뒤의 숫자
+    patterns = [
+        # Molded Depth patterns
+        r'molded\s+depth[:\s]+([\d.]+)\s*m',
+        r'Molded\s+Depth[:\s]+([\d.]+)\s*m',
+        r'MOLDED\s+DEPTH[:\s]+([\d.]+)\s*m',
+        r'depth[:\s]+([\d.]+)\s*m.*molded',
+        r'Depth[:\s]+([\d.]+)\s*m.*molded',
+        
+        # Vessel Depth patterns
+        r'vessel\s+depth[:\s]+([\d.]+)\s*m',
+        r'Vessel\s+Depth[:\s]+([\d.]+)\s*m',
+        r'VESSEL\s+DEPTH[:\s]+([\d.]+)\s*m',
+        r'depth[:\s]+([\d.]+)\s*m.*vessel',
+        r'Depth[:\s]+([\d.]+)\s*m.*vessel',
+        
+        # General depth patterns with context
+        r'Depth[:\s]+([\d.]+)\s*m',
+        r'depth[:\s]+([\d.]+)\s*m',
+        
+        # Principal Particulars table patterns
+        r'Depth\s+([\d.]+)\s*m',
+        r'D\s+[=:]\s+([\d.]+)\s*m',
+        r'D\s+([\d.]+)\s*m',
+        
+        # Specific values (3.65, 4.85)
+        r'\b(3\.65|4\.85)\s*m',
+        r'\b(3\.65|4\.85)\s+meter',
+    ]
+    
+    for pattern in patterns:
+        matches = re.finditer(pattern, text, re.IGNORECASE)
+        for match in matches:
+            value = float(match.group(1))
+            context_start = max(0, match.start() - 100)
+            context_end = min(len(text), match.end() + 100)
+            context = text[context_start:context_end].replace('\n', ' ').strip()
+            
+            findings.append({
+                'page': page_num,
+                'value': value,
+                'pattern': pattern,
+                'match': match.group(0),
+                'context': context
+            })
+    
+    return findings
+
+
+def analyze_pdf(pdf_path: Path) -> Dict:
+    """PDF 파일 분석"""
+    print(f"\n{'='*80}")
+    print(f"Analyzing: {pdf_path.name}")
+    print(f"{'='*80}")
+    
+    # 텍스트 추출
+    pages_text = extract_text_from_pdf(pdf_path)
+    
+    if not pages_text:
+        print(f"WARNING: Could not extract text from {pdf_path.name}")
+        return {
+            'file': pdf_path.name,
+            'total_pages': 0,
+            'findings': [],
+            'depth_values': []
+        }
+    
+    print(f"Extracted text from {len(pages_text)} pages")
+    
+    # 모든 페이지에서 깊이 값 검색
+    all_findings = []
+    for page_num, text in pages_text:
+        findings = search_depth_values(text, page_num)
+        all_findings.extend(findings)
+    
+    # 고유한 값 추출
+    depth_values = list(set([f['value'] for f in all_findings]))
+    depth_values.sort()
+    
+    print(f"\nFound {len(all_findings)} depth-related matches")
+    print(f"Unique depth values: {depth_values}")
+    
+    # 상세 결과 출력
+    if all_findings:
+        print(f"\nDetailed findings:")
+        for finding in all_findings[:10]:  # 처음 10개만 출력
+            print(f"  Page {finding['page']}: {finding['value']}m - {finding['match']}")
+            print(f"    Context: ...{finding['context']}...")
+    
+    return {
+        'file': pdf_path.name,
+        'total_pages': len(pages_text),
+        'findings': all_findings,
+        'depth_values': depth_values
+    }
+
+
+def main():
+    """메인 함수"""
+    # 프로젝트 루트 디렉토리
+    project_root = Path(__file__).parent.parent
+    pdf_folder = project_root / "[HVDC]AGI TRANSFORMER"
+    
+    if not pdf_folder.exists():
+        print(f"ERROR: PDF folder not found: {pdf_folder}")
+        return
+    
+    # 분석할 PDF 파일 목록
+    pdf_files = [
+        "Vessel_TankPlan_64m_LandingCraft.pdf",
+        "RoRo Simulation_stowage plan_20251103.pdf",
+        "STABILITY CALCULATION INITIAL CONDITION_20251026.pdf",
+        "Vessel_ELC_and_TankStatus.pdf",
+        "757 TCP - Tank Capacity_Plan_20251026.pdf",
+        "Mammoet_Method_Statement_DAS_Reference.pdf",
+    ]
+    
+    print("="*80)
+    print("LCT Bushra D-vessel (Molded Depth) Extraction")
+    print("="*80)
+    print(f"PDF Parser: {PDF_PARSER}")
+    print(f"PDF Folder: {pdf_folder}")
+    print(f"Files to analyze: {len(pdf_files)}")
+    
+    # 각 PDF 분석
+    results = []
+    for pdf_file in pdf_files:
+        pdf_path = pdf_folder / pdf_file
+        if pdf_path.exists():
+            result = analyze_pdf(pdf_path)
+            results.append(result)
+        else:
+            print(f"\nWARNING: File not found: {pdf_file}")
+    
+    # 결과 요약
+    print("\n" + "="*80)
+    print("SUMMARY")
+    print("="*80)
+    
+    all_depth_values = []
+    for result in results:
+        print(f"\n{result['file']}:")
+        print(f"  Pages analyzed: {result['total_pages']}")
+        print(f"  Depth values found: {result['depth_values']}")
+        all_depth_values.extend(result['depth_values'])
+    
+    # 전체 고유 값
+    unique_values = list(set(all_depth_values))
+    unique_values.sort()
+    
+    print(f"\n{'='*80}")
+    print("ALL UNIQUE DEPTH VALUES FOUND:")
+    print(f"{'='*80}")
+    for value in unique_values:
+        count = all_depth_values.count(value)
+        print(f"  {value}m (found {count} times)")
+    
+    # 3.65m와 4.85m 확인
+    print(f"\n{'='*80}")
+    print("TARGET VALUES CHECK:")
+    print(f"{'='*80}")
+    if 3.65 in unique_values:
+        print(f"  ✓ 3.65m FOUND in {all_depth_values.count(3.65)} locations")
+    else:
+        print(f"  ✗ 3.65m NOT FOUND")
+    
+    if 4.85 in unique_values:
+        print(f"  ✓ 4.85m FOUND in {all_depth_values.count(4.85)} locations")
+    else:
+        print(f"  ✗ 4.85m NOT FOUND")
+    
+    # 결과를 파일로 저장
+    output_file = project_root / "scripts" / "vessel_depth_extraction_results.txt"
+    with open(output_file, 'w', encoding='utf-8') as f:
+        f.write("LCT Bushra D-vessel (Molded Depth) Extraction Results\n")
+        f.write("="*80 + "\n\n")
+        f.write(f"PDF Parser: {PDF_PARSER}\n")
+        f.write(f"Analysis Date: {pd.Timestamp.now() if 'pd' in dir() else 'N/A'}\n\n")
+        
+        for result in results:
+            f.write(f"\n{result['file']}:\n")
+            f.write(f"  Pages: {result['total_pages']}\n")
+            f.write(f"  Depth values: {result['depth_values']}\n")
+            f.write(f"  Findings: {len(result['findings'])}\n")
+            for finding in result['findings']:
+                f.write(f"    Page {finding['page']}: {finding['value']}m - {finding['match']}\n")
+                f.write(f"      Context: {finding['context']}\n")
+        
+        f.write(f"\n\nALL UNIQUE VALUES: {unique_values}\n")
+    
+    print(f"\nResults saved to: {output_file}")
+    print("="*80)
+
+
+if __name__ == "__main__":
+    main()
+

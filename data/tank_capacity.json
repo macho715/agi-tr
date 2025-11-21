@@ -1,0 +1,10 @@
+{
+  "description": "Tank Capacity 데이터",
+  "note": "원본 파일이 NASCA DRM 바이너리 형식입니다. Excel에서 CSV로 내보낸 후 다시 시도하세요.",
+  "expected_columns": [
+    "TankName",
+    "Capacity_m3",
+    "MaxWeight_t"
+  ],
+  "data": []
+}

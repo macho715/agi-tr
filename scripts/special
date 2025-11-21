@@ -1,0 +1,628 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Patch 4: 탱크 레버암 방식 밸러스트 계산 통합
+LCT BUSHRA - Tank-Based Ballast Calculation System
+
+작성자: MACHO-GPT v3.4-mini
+날짜: 2025-11-06
+목적: 정확한 탱크별 레버암 방식의 밸러스트 계산을 Excel 시스템에 통합
+"""
+
+import openpyxl
+from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+from openpyxl.utils import get_column_letter
+from datetime import datetime
+import os
+
+# 설정
+OUTPUT_FILE = "LCT_BUSHRA_Package_TANK_LEVER_ARM.xlsx"
+OUTPUT_PATH = r"C:\Users\SAMSUNG\Downloads\KZ_measurement_note"
+
+# LCT BUSHRA 기본 파라미터 (안정성 계산서 기준, 검증된 값)
+VESSEL_PARAMS = {
+    'AP_to_midship_m': 30.151,  # Verified: AP에서 midship까지 거리 (Lpp/2)
+    'LCF_m_from_midship': 29.29,  # Verified from Stability Book (Draft ~2.50m, midship reference)
+    'LCF_m_from_AP': None,  # 계산될 값
+    'MTC_tm_per_cm': 40.72,    # Verified from Stability Book (Draft ~2.50m)
+    'TPC_t_per_cm': 7.50,      # Tons Per Centimeter
+    'Tmean_initial_m': 2.33,   # 초기 평균 흘수
+}
+
+# 좌표 변환 계산: LCF_m_from_AP = AP_to_midship_m - LCF_m_from_midship
+VESSEL_PARAMS['LCF_m_from_AP'] = VESSEL_PARAMS['AP_to_midship_m'] - VESSEL_PARAMS['LCF_m_from_midship']
+
+# 탱크 데이터베이스 (안정성 계산서 및 밸러스트 배치도 기준)
+TANK_DATABASE = [
+    # Tank_ID, LCG_AP(m), VCG(m), TCG(m), Cap_m3, Density, Cap_t, Pump_rate_tph, Priority, Usage
+    
+    # === 주요 밸러스트 탱크 (RORO 운송용) ===
+    {'Tank_ID': 'VOID3.P', 'LCG_AP': 27.750, 'VCG': 1.909, 'TCG': -3.921, 
+     'Cap_m3': 148.4, 'Density': 1.025, 'Cap_t': 152.1, 'Pump_tph': 10.0, 
+     'Priority': 1, 'Usage': '대용량 선미 모멘트'},
+    
+    {'Tank_ID': 'VOID3.S', 'LCG_AP': 27.750, 'VCG': 1.909, 'TCG': 3.921, 
+     'Cap_m3': 148.4, 'Density': 1.025, 'Cap_t': 152.1, 'Pump_tph': 10.0, 
+     'Priority': 1, 'Usage': 'P/S 균형용'},
+    
+    {'Tank_ID': 'FW1.P', 'LCG_AP': 57.519, 'VCG': 2.490, 'TCG': -2.379, 
+     'Cap_m3': 50.6, 'Density': 1.000, 'Cap_t': 50.6, 'Pump_tph': 10.0, 
+     'Priority': 2, 'Usage': '강력한 선미 모멘트'},
+    
+    {'Tank_ID': 'FW1.S', 'LCG_AP': 57.519, 'VCG': 2.490, 'TCG': 2.379, 
+     'Cap_m3': 50.6, 'Density': 1.000, 'Cap_t': 50.6, 'Pump_tph': 10.0, 
+     'Priority': 2, 'Usage': 'P/S 균형용'},
+    
+    {'Tank_ID': 'FW2.P', 'LCG_AP': 50.038, 'VCG': 2.059, 'TCG': -4.368, 
+     'Cap_m3': 110.0, 'Density': 1.000, 'Cap_t': 110.0, 'Pump_tph': 10.0, 
+     'Priority': 3, 'Usage': '중형 선미 모멘트'},
+    
+    {'Tank_ID': 'FW2.S', 'LCG_AP': 50.038, 'VCG': 2.059, 'TCG': 4.368, 
+     'Cap_m3': 110.0, 'Density': 1.000, 'Cap_t': 110.0, 'Pump_tph': 10.0, 
+     'Priority': 3, 'Usage': 'P/S 균형용'},
+    
+    {'Tank_ID': 'VOIDDB2.C', 'LCG_AP': 30.750, 'VCG': 0.400, 'TCG': 0.000, 
+     'Cap_m3': 47.9, 'Density': 1.025, 'Cap_t': 49.1, 'Pump_tph': 10.0, 
+     'Priority': 4, 'Usage': '중앙 조정'},
+    
+    # === 선수 탱크 (트림 조정용) ===
+    {'Tank_ID': 'FWCARGO2.P', 'LCG_AP': 35.250, 'VCG': 1.909, 'TCG': -3.921, 
+     'Cap_m3': 148.4, 'Density': 1.000, 'Cap_t': 148.4, 'Pump_tph': 10.0, 
+     'Priority': 5, 'Usage': '선수 모멘트 (감산용)'},
+    
+    {'Tank_ID': 'FWCARGO2.S', 'LCG_AP': 35.250, 'VCG': 1.909, 'TCG': 3.921, 
+     'Cap_m3': 148.4, 'Density': 1.000, 'Cap_t': 148.4, 'Pump_tph': 10.0, 
+     'Priority': 5, 'Usage': '선수 모멘트 (감산용)'},
+    
+    # === 미세 조정 탱크 ===
+    {'Tank_ID': 'SEWAGE.C', 'LCG_AP': 8.794, 'VCG': 1.082, 'TCG': 0.000, 
+     'Cap_m3': 2.7, 'Density': 1.025, 'Cap_t': 2.8, 'Pump_tph': 2.0, 
+     'Priority': 6, 'Usage': '미세 조정'},
+    
+    {'Tank_ID': 'D.O.P', 'LCG_AP': 11.251, 'VCG': 2.825, 'TCG': -6.247, 
+     'Cap_m3': 3.5, 'Density': 0.820, 'Cap_t': 2.9, 'Pump_tph': 2.0, 
+     'Priority': 7, 'Usage': '미세 조정'},
+]
+
+def calculate_tank_parameters():
+    """탱크별 좌표 변환 및 레버암 계산"""
+    AP_to_mid = VESSEL_PARAMS['AP_to_midship_m']
+    LCF_mid = VESSEL_PARAMS['LCF_m_from_midship']
+    
+    for tank in TANK_DATABASE:
+        # AP 기준 좌표 → midship 기준 좌표
+        tank['x_mid_m'] = AP_to_mid - tank['LCG_AP']
+        
+        # 레버암 계산 (midship 기준)
+        tank['L_b_m'] = tank['x_mid_m'] - LCF_mid
+        
+    return TANK_DATABASE
+
+def create_workbook():
+    """Excel 워크북 생성"""
+    wb = openpyxl.Workbook()
+    wb.remove(wb.active)  # 기본 시트 제거
+    return wb
+
+def apply_cell_style(cell, bold=False, fill_color=None, alignment='left'):
+    """셀 스타일 적용"""
+    if bold:
+        cell.font = Font(bold=True, size=11)
+    
+    if fill_color:
+        cell.fill = PatternFill(start_color=fill_color, end_color=fill_color, fill_type='solid')
+    
+    if alignment == 'center':
+        cell.alignment = Alignment(horizontal='center', vertical='center')
+    elif alignment == 'right':
+        cell.alignment = Alignment(horizontal='right', vertical='center')
+    else:
+        cell.alignment = Alignment(horizontal='left', vertical='center')
+    
+    # 테두리 추가
+    thin_border = Border(
+        left=Side(style='thin'),
+        right=Side(style='thin'),
+        top=Side(style='thin'),
+        bottom=Side(style='thin')
+    )
+    cell.border = thin_border
+
+def create_calc_sheet(wb):
+    """기본 계산 파라미터 시트 생성"""
+    ws = wb.create_sheet("Calc")
+    
+    # 헤더
+    ws['A1'] = "LCT BUSHRA - 기본 계산 파라미터"
+    apply_cell_style(ws['A1'], bold=True, fill_color='4472C4')
+    ws.merge_cells('A1:D1')
+    
+    # 파라미터
+    params = [
+        ('Parameter', 'Symbol', 'Value', 'Unit'),
+        ('AP to Midship', 'AP_to_midship_m', VESSEL_PARAMS['AP_to_midship_m'], 'm'),
+        ('LCF from AP', 'LCF_m_from_AP', VESSEL_PARAMS['LCF_m_from_AP'], 'm'),
+        ('LCF from Midship', 'LCF_m_from_midship', VESSEL_PARAMS['LCF_m_from_midship'], 'm'),
+        ('Moment to Change Trim', 'MTC_tm_per_cm', VESSEL_PARAMS['MTC_tm_per_cm'], 't·m/cm'),
+        ('Tons Per Centimeter', 'TPC_t_per_cm', VESSEL_PARAMS['TPC_t_per_cm'], 't/cm'),
+        ('Initial Mean Draft', 'Tmean_initial_m', VESSEL_PARAMS['Tmean_initial_m'], 'm'),
+    ]
+    
+    for row_idx, (param, symbol, value, unit) in enumerate(params, start=3):
+        ws[f'A{row_idx}'] = param
+        ws[f'B{row_idx}'] = symbol
+        ws[f'C{row_idx}'] = value
+        ws[f'D{row_idx}'] = unit
+        
+        for col in ['A', 'B', 'C', 'D']:
+            apply_cell_style(ws[f'{col}{row_idx}'])
+    
+    # 헤더 스타일
+    for col in ['A', 'B', 'C', 'D']:
+        apply_cell_style(ws[f'{col}3'], bold=True, fill_color='D9E1F2')
+    
+    # 열 너비 조정
+    ws.column_dimensions['A'].width = 25
+    ws.column_dimensions['B'].width = 25
+    ws.column_dimensions['C'].width = 15
+    ws.column_dimensions['D'].width = 15
+    
+    return ws
+
+def create_tank_catalog_sheet(wb, tank_data):
+    """탱크 카탈로그 시트 생성"""
+    ws = wb.create_sheet("Tank_Catalog")
+    
+    # 헤더
+    ws['A1'] = "LCT BUSHRA - 탱크 카탈로그 (Tank Database)"
+    apply_cell_style(ws['A1'], bold=True, fill_color='4472C4')
+    ws.merge_cells('A1:L1')
+    
+    ws['A2'] = f"생성일시: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+    ws.merge_cells('A2:L2')
+    
+    # 컬럼 헤더
+    headers = [
+        'Tank_ID', 'LCG_AP(m)', 'x_mid(m)', 'L_b(m)', 'Cap(m³)', 
+        'Density', 'Cap(t)', 'Pump(t/h)', 'Priority', 'VCG(m)', 'TCG(m)', 'Usage'
+    ]
+    
+    for col_idx, header in enumerate(headers, start=1):
+        cell = ws.cell(row=4, column=col_idx, value=header)
+        apply_cell_style(cell, bold=True, fill_color='D9E1F2', alignment='center')
+    
+    # 데이터 입력
+    for row_idx, tank in enumerate(tank_data, start=5):
+        ws[f'A{row_idx}'] = tank['Tank_ID']
+        ws[f'B{row_idx}'] = tank['LCG_AP']
+        ws[f'C{row_idx}'] = tank['x_mid_m']
+        ws[f'D{row_idx}'] = tank['L_b_m']
+        ws[f'E{row_idx}'] = tank['Cap_m3']
+        ws[f'F{row_idx}'] = tank['Density']
+        ws[f'G{row_idx}'] = tank['Cap_t']
+        ws[f'H{row_idx}'] = tank['Pump_tph']
+        ws[f'I{row_idx}'] = tank['Priority']
+        ws[f'J{row_idx}'] = tank['VCG']
+        ws[f'K{row_idx}'] = tank['TCG']
+        ws[f'L{row_idx}'] = tank['Usage']
+        
+        # 스타일 적용
+        for col in range(1, 13):
+            apply_cell_style(ws.cell(row=row_idx, column=col))
+    
+    # 열 너비 조정
+    col_widths = [15, 12, 12, 12, 12, 10, 12, 12, 10, 12, 12, 20]
+    for col_idx, width in enumerate(col_widths, start=1):
+        ws.column_dimensions[get_column_letter(col_idx)].width = width
+    
+    # 주석 추가
+    note_row = len(tank_data) + 6
+    ws[f'A{note_row}'] = "주의사항:"
+    apply_cell_style(ws[f'A{note_row}'], bold=True, fill_color='FFF2CC')
+    
+    notes = [
+        "1. x_mid = AP_to_midship - LCG_AP (30.151 - LCG_AP)",
+        "2. L_b = x_mid - LCF_from_midship (x_mid - 29.29)",
+        "3. L_b < 0: 탱크가 LCF보다 선수 쪽 → 주입 시 선미 트림 증가",
+        "4. L_b > 0: 탱크가 LCF보다 선미 쪽 → 주입 시 선수 트림 증가",
+        "5. Priority: 1=최우선, 7=최하위",
+    ]
+    
+    for idx, note in enumerate(notes, start=note_row+1):
+        ws[f'A{idx}'] = note
+        ws.merge_cells(f'A{idx}:L{idx}')
+    
+    return ws
+
+def create_roro_tank_ballast_sheet(wb):
+    """RORO 단계별 탱크 밸러스트 계산 시트 생성"""
+    ws = wb.create_sheet("RORO_Stage_Tank_Ballast")
+    
+    # 제목
+    ws['A1'] = "LCT BUSHRA - RORO 단계별 탱크 밸러스트 계산"
+    apply_cell_style(ws['A1'], bold=True, fill_color='70AD47')
+    ws.merge_cells('A1:P1')
+    
+    # 기본 파라미터 표시
+    ws['A3'] = "기본 파라미터 (Calc 시트 참조)"
+    apply_cell_style(ws['A3'], bold=True, fill_color='E2EFDA')
+    ws.merge_cells('A3:D3')
+    
+    ws['A4'] = "LCF (midship 기준)"
+    ws['B4'] = VESSEL_PARAMS['LCF_m_from_midship']
+    ws['C4'] = "m"
+    ws['A5'] = "MTC"
+    ws['B5'] = VESSEL_PARAMS['MTC_tm_per_cm']
+    ws['C5'] = "t·m/cm"
+    ws['A6'] = "TPC"
+    ws['B6'] = VESSEL_PARAMS['TPC_t_per_cm']
+    ws['C6'] = "t/cm"
+    
+    for row in range(4, 7):
+        for col in ['A', 'B', 'C']:
+            apply_cell_style(ws[f'{col}{row}'])
+    
+    # 계산 테이블 헤더
+    header_row = 9
+    ws[f'A{header_row}'] = "단계별 화물 적재 및 밸러스트 계산"
+    apply_cell_style(ws[f'A{header_row}'], bold=True, fill_color='70AD47')
+    ws.merge_cells(f'A{header_row}:P{header_row}')
+    
+    # 컬럼 헤더
+    col_header_row = header_row + 1
+    headers = [
+        'Stage', 'W_stage(t)', 'x_stage(m)', 'TM_stage(t·m)', 
+        'ΣW(t)', 'ΣTM_current(t·m)', 'Trim_current(m)',
+        'TM_target(t·m)', 'ΔTM_need(t·m)',
+        'Ballast_Tank', 'Tank_Lb(m)', 'Ballast_t', 
+        'Ballast_time(h)', 'Final_Trim(m)', 'Check', 'Notes'
+    ]
+    
+    for col_idx, header in enumerate(headers, start=1):
+        cell = ws.cell(row=col_header_row, column=col_idx, value=header)
+        apply_cell_style(cell, bold=True, fill_color='C6E0B4', alignment='center')
+    
+    # 예시 데이터 (5개 단계)
+    example_data = [
+        {'Stage': 1, 'W': 217, 'x': -5.0, 'Tank': 'VOID3.P', 'Notes': '변압기 1 적재'},
+        {'Stage': 2, 'W': 108, 'x': 10.0, 'Tank': 'FW2.P', 'Notes': '변압기 2 적재'},
+        {'Stage': 3, 'W': 54, 'x': 15.0, 'Tank': 'VOIDDB2.C', 'Notes': 'SPMT 이동'},
+        {'Stage': 4, 'W': 0, 'x': 0, 'Tank': 'FW1.S', 'Notes': '최종 트림 조정'},
+        {'Stage': 5, 'W': 0, 'x': 0, 'Tank': '', 'Notes': '완료 상태 확인'},
+    ]
+    
+    data_start_row = col_header_row + 1
+    for idx, data in enumerate(example_data):
+        row = data_start_row + idx
+        
+        # Stage
+        ws[f'A{row}'] = data['Stage']
+        apply_cell_style(ws[f'A{row}'], fill_color='FFFF00', alignment='center')
+        
+        # W_stage (입력 필드)
+        ws[f'B{row}'] = data['W']
+        apply_cell_style(ws[f'B{row}'], fill_color='FFFF00')
+        
+        # x_stage (입력 필드)
+        ws[f'C{row}'] = data['x']
+        apply_cell_style(ws[f'C{row}'], fill_color='FFFF00')
+        
+        # TM_stage 계산
+        if row == data_start_row:
+            ws[f'D{row}'] = f"=IF(OR(B{row}=\"\",C{row}=\"\"),\"\",B{row}*(C{row}-$B$4))"
+        else:
+            ws[f'D{row}'] = f"=IF(OR(B{row}=\"\",C{row}=\"\"),\"\",B{row}*(C{row}-$B$4))"
+        apply_cell_style(ws[f'D{row}'])
+        
+        # ΣW 누적
+        if row == data_start_row:
+            ws[f'E{row}'] = f"=IF(B{row}=\"\",\"\",B{row})"
+        else:
+            ws[f'E{row}'] = f"=IF(B{row}=\"\",E{row-1},E{row-1}+B{row})"
+        apply_cell_style(ws[f'E{row}'])
+        
+        # ΣTM_current 누적
+        if row == data_start_row:
+            ws[f'F{row}'] = f"=IF(D{row}=\"\",\"\",D{row})"
+        else:
+            ws[f'F{row}'] = f"=IF(D{row}=\"\",F{row-1},F{row-1}+D{row})"
+        apply_cell_style(ws[f'F{row}'])
+        
+        # Trim_current 계산
+        ws[f'G{row}'] = f"=IF(F{row}=\"\",\"\",F{row}/($B$5*100))"
+        apply_cell_style(ws[f'G{row}'])
+        
+        # TM_target (입력 필드)
+        ws[f'H{row}'] = ""
+        apply_cell_style(ws[f'H{row}'], fill_color='FFFF00')
+        
+        # ΔTM_need 계산
+        ws[f'I{row}'] = f"=IF(OR(F{row}=\"\",H{row}=\"\"),\"\",H{row}-F{row})"
+        apply_cell_style(ws[f'I{row}'])
+        
+        # Ballast_Tank (입력 필드)
+        ws[f'J{row}'] = data['Tank']
+        apply_cell_style(ws[f'J{row}'], fill_color='FFFF00')
+        
+        # Tank_Lb (VLOOKUP)
+        ws[f'K{row}'] = f"=IF(J{row}=\"\",\"\",VLOOKUP(J{row},Tank_Catalog!A:D,4,FALSE))"
+        apply_cell_style(ws[f'K{row}'])
+        
+        # Ballast_t 계산
+        ws[f'L{row}'] = f"=IF(OR(I{row}=\"\",K{row}=\"\",K{row}=0),\"\",I{row}/K{row})"
+        apply_cell_style(ws[f'L{row}'])
+        
+        # Ballast_time 계산
+        ws[f'M{row}'] = f"=IF(OR(L{row}=\"\",J{row}=\"\"),\"\",ABS(L{row})/VLOOKUP(J{row},Tank_Catalog!A:H,8,FALSE))"
+        apply_cell_style(ws[f'M{row}'])
+        
+        # Final_Trim 계산
+        ws[f'N{row}'] = f"=IF(L{row}=\"\",G{row},G{row}+(L{row}*K{row})/($B$5*100))"
+        apply_cell_style(ws[f'N{row}'])
+        
+        # Check
+        ws[f'O{row}'] = f"=IF(L{row}=\"\",\"\",IF(ABS(L{row})>VLOOKUP(J{row},Tank_Catalog!A:G,7,FALSE),\"용량 초과\",\"OK\"))"
+        apply_cell_style(ws[f'O{row}'])
+        
+        # Notes
+        ws[f'P{row}'] = data['Notes']
+        apply_cell_style(ws[f'P{row}'])
+    
+    # 열 너비 조정
+    col_widths = [8, 12, 12, 14, 12, 16, 14, 14, 14, 15, 12, 12, 14, 14, 12, 20]
+    for col_idx, width in enumerate(col_widths, start=1):
+        ws.column_dimensions[get_column_letter(col_idx)].width = width
+    
+    # 설명 추가
+    note_row = data_start_row + len(example_data) + 2
+    ws[f'A{note_row}'] = "사용 방법:"
+    apply_cell_style(ws[f'A{note_row}'], bold=True, fill_color='FFF2CC')
+    
+    usage_notes = [
+        "1. 노란색 셀에 값을 입력하세요: W_stage(t), x_stage(m), TM_target(t·m), Ballast_Tank",
+        "2. TM_target: 원하는 목표 모멘트 또는 목표 트림에서 계산 (TM = MTC × 100 × Trim)",
+        "3. Ballast_Tank: Tank_Catalog 시트에서 탱크 ID 선택",
+        "4. ΔTM_need > 0: 선미 트림 필요 → L_b < 0인 탱크 선택 (VOID3, FW1, FW2 등)",
+        "5. ΔTM_need < 0: 선수 트림 필요 → L_b > 0인 탱크 선택 또는 선미 탱크에서 제거",
+        "6. Ballast_t 음수: 제거, 양수: 주입 (절댓값으로 실제 톤수 확인)",
+        "7. Check 열에서 용량 초과 확인 → 여러 탱크 조합 필요",
+    ]
+    
+    for idx, note in enumerate(usage_notes, start=note_row+1):
+        ws[f'A{idx}'] = note
+        ws.merge_cells(f'A{idx}:P{idx}')
+    
+    return ws
+
+def create_tank_selection_guide_sheet(wb):
+    """탱크 선택 가이드 시트 생성"""
+    ws = wb.create_sheet("Tank_Selection_Guide")
+    
+    # 제목
+    ws['A1'] = "시나리오별 탱크 선택 가이드"
+    apply_cell_style(ws['A1'], bold=True, fill_color='FFC000')
+    ws.merge_cells('A1:E1')
+    
+    # 가이드 테이블
+    guide_data = [
+        ('시나리오', '목표', '방법', '추천 탱크', '비고'),
+        ('선미 트림 증가\n(ΔTM > 0)', '선미 방향 트림', '선미 탱크 주입', 'VOID3.P/S, FW1.P/S, FW2.P/S', 'L_b < 0, Priority 1-3'),
+        ('선수 트림 증가\n(ΔTM < 0)', '선수 방향 트림', '선수 탱크 주입\n또는 선미 탱크 제거', 'FWCARGO2.P/S\n또는 VOID3 제거', 'L_b > 0 (선수)\n또는 선미에서 제거'),
+        ('대용량 조정', '큰 모멘트 변화', '대용량 탱크 사용', 'VOID3.P/S (152t)\nFW2.P/S (110t)', '단일 탱크로 큰 효과'),
+        ('강력한 모멘트', '짧은 레버암으로\n큰 효과', '레버암이 작은 탱크', 'FW1.P/S (L_b=-58.10)', '소량으로 강력한 효과'),
+        ('미세 조정', '작은 트림 보정', '소용량 탱크', 'SEWAGE.C (2.8t)\nD.O.P (2.9t)', '최종 단계 미세 조정'),
+        ('P/S 균형', '횡경사 방지', '좌우 대칭 주입', '모든 P/S 탱크 쌍', 'TCG = 0 유지'),
+        ('중앙 조정', '중립 위치 조정', '중앙선 탱크', 'VOIDDB2.C', 'TCG = 0'),
+    ]
+    
+    header_row = 3
+    for col_idx, header in enumerate(guide_data[0], start=1):
+        cell = ws.cell(row=header_row, column=col_idx, value=header)
+        apply_cell_style(cell, bold=True, fill_color='FFE699', alignment='center')
+    
+    for row_idx, row_data in enumerate(guide_data[1:], start=header_row+1):
+        for col_idx, value in enumerate(row_data, start=1):
+            cell = ws.cell(row=row_idx, column=col_idx, value=value)
+            apply_cell_style(cell, alignment='left')
+            cell.alignment = Alignment(horizontal='left', vertical='top', wrap_text=True)
+    
+    # 행 높이 조정
+    for row in range(header_row+1, header_row+len(guide_data)):
+        ws.row_dimensions[row].height = 45
+    
+    # 열 너비 조정
+    ws.column_dimensions['A'].width = 20
+    ws.column_dimensions['B'].width = 20
+    ws.column_dimensions['C'].width = 20
+    ws.column_dimensions['D'].width = 25
+    ws.column_dimensions['E'].width = 25
+    
+    # 계산 공식 설명
+    formula_row = header_row + len(guide_data) + 2
+    ws[f'A{formula_row}'] = "계산 공식:"
+    apply_cell_style(ws[f'A{formula_row}'], bold=True, fill_color='E7E6E6')
+    
+    formulas = [
+        "1. 레버암: L_b = x_mid - LCF (x_mid: midship 기준 탱크 위치, LCF: 부심 종위치)",
+        "2. 필요 모멘트: ΔTM = TM_target - TM_current",
+        "3. 밸러스트 톤수: Ballast_t = ΔTM / L_b",
+        "4. 밸러스트 시간: t = |Ballast_t| / Pump_rate",
+        "5. 목표 모멘트: TM_target = MTC × 100 × Trim_target",
+        "6. 부호 규칙:",
+        "   - ΔTM > 0, L_b < 0 → Ballast_t < 0 → 주입 (절댓값)",
+        "   - ΔTM < 0, L_b > 0 → Ballast_t < 0 → 주입 (절댓값)",
+        "   - 결과 음수 = 주입, 양수 = 제거 (실무에서는 절댓값 사용)",
+    ]
+    
+    for idx, formula in enumerate(formulas, start=formula_row+1):
+        ws[f'A{idx}'] = formula
+        ws.merge_cells(f'A{idx}:E{idx}')
+    
+    return ws
+
+def create_example_calculation_sheet(wb):
+    """예시 계산 시트 생성"""
+    ws = wb.create_sheet("Example_Calculation")
+    
+    # 제목
+    ws['A1'] = "실전 예시 계산"
+    apply_cell_style(ws['A1'], bold=True, fill_color='5B9BD5')
+    ws.merge_cells('A1:D1')
+    
+    # Example 1
+    ws['A3'] = "Example 1: Stage 1 화물 적재 (217t, x=-5m)"
+    apply_cell_style(ws['A3'], bold=True, fill_color='DDEBF7')
+    ws.merge_cells('A3:D3')
+    
+    example1 = [
+        ('항목', '값', '단위', '설명'),
+        ('W_stage', 217, 't', '화물 중량'),
+        ('x_stage', -5, 'm', '화물 위치 (선수 쪽)'),
+        ('LCF', VESSEL_PARAMS['LCF_m_from_midship'], 'm', 'Longitudinal Center of Floatation'),
+        ('TM_current', '=217*(-5-29.29)', 't·m', '현재 모멘트'),
+        ('계산 결과', -7443.93, 't·m', ''),
+        ('목표', 'Even-keel (Trim=0)', '', ''),
+        ('TM_target', 0, 't·m', ''),
+        ('ΔTM', 7443.93, 't·m', '필요 모멘트'),
+        ('탱크 선택', 'VOID3.P', '', 'L_b = -28.16 m'),
+        ('Ballast_t', '=7443.93/(-28.16)', 't', ''),
+        ('계산 결과', -264.4, 't', '264.4톤 주입'),
+        ('용량 확인', '152.1 t < 264.4 t', '', '용량 부족 - 추가 탱크 필요'),
+        ('주입 시간', '=264.4/10', 'h', '26.4 시간'),
+    ]
+    
+    row_start = 4
+    for idx, row_data in enumerate(example1, start=row_start):
+        for col_idx, value in enumerate(row_data, start=1):
+            cell = ws.cell(row=idx, column=col_idx, value=value)
+            apply_cell_style(cell)
+    
+    # Example 2
+    example2_start = row_start + len(example1) + 2
+    ws[f'A{example2_start}'] = "Example 2: 선미 트림 2.0m 달성"
+    apply_cell_style(ws[f'A{example2_start}'], bold=True, fill_color='DDEBF7')
+    ws.merge_cells(f'A{example2_start}:D{example2_start}')
+    
+    example2 = [
+        ('항목', '값', '단위', '설명'),
+        ('목표 Trim', 2.0, 'm', '선미 방향'),
+        ('MTC', VESSEL_PARAMS['MTC_tm_per_cm'], 't·m/cm', ''),
+        ('TM_target', '=40.72*100*2.0', 't·m', ''),
+        ('계산 결과', 8144, 't·m', ''),
+        ('TM_current', 0, 't·m', '초기 상태'),
+        ('ΔTM', 8144, 't·m', ''),
+        ('탱크 조합:', '', '', ''),
+        ('1) VOID3.P', 152.1, 't', 'L_b=-28.16, TM=-4283'),
+        ('2) FW1.P', 23.2, 't', 'L_b=-58.10, TM=-1348'),
+        ('3) VOID3.S', 83.8, 't', 'L_b=-28.16, TM=-2359'),
+        ('총 밸러스트', 259.1, 't', ''),
+        ('총 모멘트', -7990, 't·m', '≈ -6790 (목표 달성)'),
+        ('주입 시간', '약 15.2 h', '', 'VOID3.P 기준 (병렬 작업 시)'),
+    ]
+    
+    for idx, row_data in enumerate(example2, start=example2_start+1):
+        for col_idx, value in enumerate(row_data, start=1):
+            cell = ws.cell(row=idx, column=col_idx, value=value)
+            apply_cell_style(cell)
+    
+    # Example 3: New Final Trim Calculation
+    example3_start = example2_start + len(example2) + 2
+    ws[f'A{example3_start}'] = "Example 3: New Final Trim Calculation (at Displacement 1,713.t)"
+    apply_cell_style(ws[f'A{example3_start}'], bold=True, fill_color='DDEBF7')
+    ws.merge_cells(f'A{example3_start}:D{example3_start}')
+    
+    example3 = [
+        ('항목', '값', '단위', '설명'),
+        ('Displacement', 1713.59, 't', '총 배수량'),
+        ('LCB (at 1,713.t)', 30.91, 'm', 'Longitudinal Center of Buoyancy (from image_dbd082)'),
+        ('MTC (at 1,713.t)', 41.47, 't·m/cm', 'Moment to Change Trim (from image_dbd082)'),
+        ('LCG', 24.94, 'm', 'Longitudinal Center of Gravity'),
+        ('BG (Lever Arm)', '=30.91-24.94', 'm', 'LCB - LCG = +5.97 m'),
+        ('계산 결과', 5.97, 'm', 'LCG가 LCB보다 선수(FWD)에 있음'),
+        ('Trim (m)', '=(1713.59*5.97)/(41.47*100)', 'm', '(Disp × BG) / (MTC × 100)'),
+        ('계산 결과', 2.47, 'm', '최종 트림 (선미 방향)'),
+    ]
+    
+    for idx, row_data in enumerate(example3, start=example3_start+1):
+        for col_idx, value in enumerate(row_data, start=1):
+            cell = ws.cell(row=idx, column=col_idx, value=value)
+            apply_cell_style(cell)
+    
+    # 열 너비 조정
+    ws.column_dimensions['A'].width = 20
+    ws.column_dimensions['B'].width = 20
+    ws.column_dimensions['C'].width = 15
+    ws.column_dimensions['D'].width = 30
+    
+    return ws
+
+def main():
+    """메인 실행 함수"""
+    print("=" * 60)
+    print("LCT BUSHRA - Patch 4: 탱크 레버암 방식 밸러스트 계산 시스템")
+    print("=" * 60)
+    
+    # 탱크 파라미터 계산
+    print("\n[1/7] 탱크 파라미터 계산 중...")
+    tank_data = calculate_tank_parameters()
+    print(f"   ✓ {len(tank_data)}개 탱크 데이터 준비 완료")
+    
+    # Excel 워크북 생성
+    print("\n[2/7] Excel 워크북 생성 중...")
+    wb = create_workbook()
+    print("   ✓ 워크북 생성 완료")
+    
+    # 시트 생성
+    print("\n[3/7] Calc 시트 생성 중...")
+    create_calc_sheet(wb)
+    print("   ✓ 기본 계산 파라미터 시트 완료")
+    
+    print("\n[4/7] Tank_Catalog 시트 생성 중...")
+    create_tank_catalog_sheet(wb, tank_data)
+    print("   ✓ 탱크 카탈로그 시트 완료")
+    
+    print("\n[5/7] RORO_Stage_Tank_Ballast 시트 생성 중...")
+    create_roro_tank_ballast_sheet(wb)
+    print("   ✓ RORO 단계별 밸러스트 계산 시트 완료")
+    
+    print("\n[6/7] Tank_Selection_Guide 시트 생성 중...")
+    create_tank_selection_guide_sheet(wb)
+    print("   ✓ 탱크 선택 가이드 시트 완료")
+    
+    print("\n[7/7] Example_Calculation 시트 생성 중...")
+    create_example_calculation_sheet(wb)
+    print("   ✓ 예시 계산 시트 완료")
+    
+    # 파일 저장
+    output_file = os.path.join(OUTPUT_PATH, OUTPUT_FILE)
+    print(f"\n파일 저장 중: {output_file}")
+    wb.save(output_file)
+    print(f"   ✓ 파일 저장 완료!")
+    
+    # 요약 정보
+    print("\n" + "=" * 60)
+    print("생성 완료!")
+    print("=" * 60)
+    print(f"출력 파일: {output_file}")
+    print(f"생성 시트: {len(wb.sheetnames)}개")
+    print(f"  - Calc (기본 파라미터)")
+    print(f"  - Tank_Catalog ({len(tank_data)}개 탱크)")
+    print(f"  - RORO_Stage_Tank_Ballast (단계별 계산)")
+    print(f"  - Tank_Selection_Guide (선택 가이드)")
+    print(f"  - Example_Calculation (예시)")
+    print("\n다음 단계:")
+    print("  1. Excel 파일 열기")
+    print("  2. RORO_Stage_Tank_Ballast 시트에서 노란색 셀 입력")
+    print("  3. Tank_Selection_Guide 참고하여 탱크 선택")
+    print("  4. 자동 계산 결과 확인")
+    print("\n상세 가이드: docs/PATCH4_TANK_LEVER_ARM_GUIDE.md")
+    print("=" * 60)
+
+if __name__ == "__main__":
+    try:
+        main()
+    except Exception as e:
+        print(f"\n❌ 오류 발생: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        input("\nPress Enter to exit...")

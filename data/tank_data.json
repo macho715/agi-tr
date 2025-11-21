@@ -1,0 +1,302 @@
+{
+  "title": "Tank Capacity",
+  "data": [
+    {
+      "Tank_Name": "DO.P",
+      "Location": "Fr.24-25",
+      "Load_pct": 100.0,
+      "Weight_MT": 3.05,
+      "LCG_m": 11.25,
+      "TCG_m": 6.25,
+      "VCG_m": 2.83,
+      "Volume_m3": 3.5,
+      "Max_FSM_MT_m": 0.34
+    },
+    {
+      "Tank_Name": "DO.S",
+      "Location": "Fr.24-25",
+      "Load_pct": 100.0,
+      "Weight_MT": 3.05,
+      "LCG_m": 11.25,
+      "TCG_m": 6.25,
+      "VCG_m": 2.83,
+      "Volume_m3": 3.5,
+      "Max_FSM_MT_m": 0.34
+    },
+    {
+      "Tank_Name": "FODB1.C",
+      "Location": "Fr.22-27",
+      "Load_pct": 100.0,
+      "Weight_MT": 21.89,
+      "LCG_m": 12.29,
+      "TCG_m": 0.0,
+      "VCG_m": 0.67,
+      "Volume_m3": 25.2,
+      "Max_FSM_MT_m": 48.1
+    },
+    {
+      "Tank_Name": "FODB1.P",
+      "Location": "Fr.22-27",
+      "Load_pct": 100.0,
+      "Weight_MT": 13.77,
+      "LCG_m": 12.3,
+      "TCG_m": 4.32,
+      "VCG_m": 0.74,
+      "Volume_m3": 15.8,
+      "Max_FSM_MT_m": 23.21
+    },
+    {
+      "Tank_Name": "FODB1.S",
+      "Location": "Fr.22-27",
+      "Load_pct": 100.0,
+      "Weight_MT": 13.77,
+      "LCG_m": 12.3,
+      "TCG_m": 4.32,
+      "VCG_m": 0.74,
+      "Volume_m3": 15.8,
+      "Max_FSM_MT_m": 23.21
+    },
+    {
+      "Tank_Name": "FOW1.P",
+      "Location": "Fr.24-27",
+      "Load_pct": 100.0,
+      "Weight_MT": 10.39,
+      "LCG_m": 13.16,
+      "TCG_m": 6.25,
+      "VCG_m": 2.32,
+      "Volume_m3": 11.9,
+      "Max_FSM_MT_m": 1.04
+    },
+    {
+      "Tank_Name": "FOW1.S",
+      "Location": "Fr.24-27",
+      "Load_pct": 100.0,
+      "Weight_MT": 10.39,
+      "LCG_m": 13.16,
+      "TCG_m": 6.25,
+      "VCG_m": 2.32,
+      "Volume_m3": 11.9,
+      "Max_FSM_MT_m": 1.04
+    },
+    {
+      "Tank_Name": "LRFO.P",
+      "Location": "Fr.27-33",
+      "Load_pct": 100.0,
+      "Weight_MT": 154.89,
+      "LCG_m": 19.5,
+      "TCG_m": 3.92,
+      "VCG_m": 1.91,
+      "Volume_m3": 178.0,
+      "Max_FSM_MT_m": 133.89
+    },
+    {
+      "Tank_Name": "LRFO.S",
+      "Location": "Fr.27-33",
+      "Load_pct": 100.0,
+      "Weight_MT": 154.89,
+      "LCG_m": 19.5,
+      "TCG_m": 3.92,
+      "VCG_m": 1.91,
+      "Volume_m3": 178.0,
+      "Max_FSM_MT_m": 133.89
+    },
+    {
+      "Tank_Name": "FW1.P",
+      "Location": "Fr.6-21",
+      "Load_pct": 100.0,
+      "Weight_MT": 23.16,
+      "LCG_m": 5.98,
+      "TCG_m": 6.09,
+      "VCG_m": 3.13,
+      "Volume_m3": 23.2,
+      "Max_FSM_MT_m": 1.15
+    },
+    {
+      "Tank_Name": "FW1.S",
+      "Location": "Fr.6-21",
+      "Load_pct": 100.0,
+      "Weight_MT": 23.16,
+      "LCG_m": 5.98,
+      "TCG_m": 6.09,
+      "VCG_m": 3.13,
+      "Volume_m3": 23.2,
+      "Max_FSM_MT_m": 1.15
+    },
+    {
+      "Tank_Name": "FW2.P",
+      "Location": "Fr.0-6",
+      "Load_pct": 100.0,
+      "Weight_MT": 13.92,
+      "LCG_m": 0.12,
+      "TCG_m": 4.69,
+      "VCG_m": 3.54,
+      "Volume_m3": 13.9,
+      "Max_FSM_MT_m": 3.71
+    },
+    {
+      "Tank_Name": "FW2.S",
+      "Location": "Fr.0-6",
+      "Load_pct": 100.0,
+      "Weight_MT": 13.92,
+      "LCG_m": 0.12,
+      "TCG_m": 4.69,
+      "VCG_m": 3.54,
+      "Volume_m3": 13.9,
+      "Max_FSM_MT_m": 3.71
+    },
+    {
+      "Tank_Name": "FWCARGO1.P",
+      "Location": "Fr.43-48",
+      "Load_pct": 100.0,
+      "Weight_MT": 148.35,
+      "LCG_m": 42.75,
+      "TCG_m": 3.92,
+      "VCG_m": 1.91,
+      "Volume_m3": 148.4,
+      "Max_FSM_MT_m": 128.25
+    },
+    {
+      "Tank_Name": "FWCARGO1.S",
+      "Location": "Fr.43-48",
+      "Load_pct": 100.0,
+      "Weight_MT": 148.35,
+      "LCG_m": 42.75,
+      "TCG_m": 3.92,
+      "VCG_m": 1.91,
+      "Volume_m3": 148.4,
+      "Max_FSM_MT_m": 128.25
+    },
+    {
+      "Tank_Name": "FWCARGO2.P",
+      "Location": "Fr.38-43",
+      "Load_pct": 100.0,
+      "Weight_MT": 148.36,
+      "LCG_m": 35.25,
+      "TCG_m": 3.92,
+      "VCG_m": 1.91,
+      "Volume_m3": 148.4,
+      "Max_FSM_MT_m": 128.25
+    },
+    {
+      "Tank_Name": "FWCARGO2.S",
+      "Location": "Fr.38-43",
+      "Load_pct": 100.0,
+      "Weight_MT": 148.36,
+      "LCG_m": 35.25,
+      "TCG_m": 3.92,
+      "VCG_m": 1.91,
+      "Volume_m3": 148.4,
+      "Max_FSM_MT_m": 128.25
+    },
+    {
+      "Tank_Name": "FWB1.P",
+      "Location": "Fr.56-FE",
+      "Load_pct": 100.0,
+      "Weight_MT": 50.57,
+      "LCG_m": 57.52,
+      "TCG_m": 2.38,
+      "VCG_m": 2.49,
+      "Volume_m3": 50.6,
+      "Max_FSM_MT_m": 74.26
+    },
+    {
+      "Tank_Name": "FWB1.S",
+      "Location": "Fr.56-FE",
+      "Load_pct": 100.0,
+      "Weight_MT": 50.57,
+      "LCG_m": 57.52,
+      "TCG_m": 2.38,
+      "VCG_m": 2.49,
+      "Volume_m3": 50.6,
+      "Max_FSM_MT_m": 74.26
+    },
+    {
+      "Tank_Name": "FWB2.P",
+      "Location": "Fr.48-53",
+      "Load_pct": 100.0,
+      "Weight_MT": 109.98,
+      "LCG_m": 50.04,
+      "TCG_m": 4.37,
+      "VCG_m": 2.06,
+      "Volume_m3": 110.0,
+      "Max_FSM_MT_m": 72.01
+    },
+    {
+      "Tank_Name": "FWB2.S",
+      "Location": "Fr.48-53",
+      "Load_pct": 100.0,
+      "Weight_MT": 109.98,
+      "LCG_m": 50.04,
+      "TCG_m": 4.37,
+      "VCG_m": 2.06,
+      "Volume_m3": 110.0,
+      "Max_FSM_MT_m": 72.01
+    },
+    {
+      "Tank_Name": "CL.P",
+      "Location": "Fr.56-59",
+      "Load_pct": 100.0,
+      "Weight_MT": 7.12,
+      "LCG_m": 56.25,
+      "TCG_m": 4.75,
+      "VCG_m": 4.23,
+      "Volume_m3": 6.9,
+      "Max_FSM_MT_m": 0.41
+    },
+    {
+      "Tank_Name": "CL.S",
+      "Location": "Fr.56-59",
+      "Load_pct": 100.0,
+      "Weight_MT": 7.12,
+      "LCG_m": 56.25,
+      "TCG_m": 4.75,
+      "VCG_m": 4.23,
+      "Volume_m3": 6.9,
+      "Max_FSM_MT_m": 0.41
+    },
+    {
+      "Tank_Name": "VOID3.P",
+      "Location": "Fr.33-38",
+      "Load_pct": 100.0,
+      "Weight_MT": 152.08,
+      "LCG_m": 27.75,
+      "TCG_m": 3.92,
+      "VCG_m": 1.91,
+      "Volume_m3": 148.4,
+      "Max_FSM_MT_m": 131.46
+    },
+    {
+      "Tank_Name": "VOID3.S",
+      "Location": "Fr.33-38",
+      "Load_pct": 100.0,
+      "Weight_MT": 152.08,
+      "LCG_m": 27.75,
+      "TCG_m": 3.92,
+      "VCG_m": 1.91,
+      "Volume_m3": 148.4,
+      "Max_FSM_MT_m": 131.46
+    },
+    {
+      "Tank_Name": "SLUDGE.C",
+      "Location": "Fr.19-22",
+      "Load_pct": 100.0,
+      "Weight_MT": 5.42,
+      "LCG_m": 8.79,
+      "TCG_m": 0.0,
+      "VCG_m": 1.08,
+      "Volume_m3": 6.2,
+      "Max_FSM_MT_m": 15.2
+    },
+    {
+      "Tank_Name": "SEWAGE.P",
+      "Location": "Fr.19-22",
+      "Load_pct": 100.0,
+      "Weight_MT": 2.73,
+      "LCG_m": 8.85,
+      "TCG_m": 4.11,
+      "VCG_m": 1.14,
+      "Volume_m3": 2.7,
+      "Max_FSM_MT_m": 2.39
+    }
+  ]
+}

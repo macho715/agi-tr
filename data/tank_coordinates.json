@@ -1,0 +1,302 @@
+{
+  "title": "Tank 좌표",
+  "data": [
+    {
+      "Tank_Name": "DO.P",
+      "Fr_Start": 24.0,
+      "Fr_End": 25.0,
+      "Mid_Fr": 24.5,
+      "X_LCG_m": 11.25,
+      "Y_TCG_m": -6.25,
+      "Z_VCG_m": -2.83,
+      "Weight_MT": 3.05,
+      "Volume_m3": 3.5
+    },
+    {
+      "Tank_Name": "DO.S",
+      "Fr_Start": 24.0,
+      "Fr_End": 25.0,
+      "Mid_Fr": 24.5,
+      "X_LCG_m": 11.25,
+      "Y_TCG_m": 6.25,
+      "Z_VCG_m": -2.83,
+      "Weight_MT": 3.05,
+      "Volume_m3": 3.5
+    },
+    {
+      "Tank_Name": "FODB1.C",
+      "Fr_Start": 22.0,
+      "Fr_End": 27.0,
+      "Mid_Fr": 24.5,
+      "X_LCG_m": 12.29,
+      "Y_TCG_m": 0.0,
+      "Z_VCG_m": -0.67,
+      "Weight_MT": 21.89,
+      "Volume_m3": 25.2
+    },
+    {
+      "Tank_Name": "FODB1.P",
+      "Fr_Start": 22.0,
+      "Fr_End": 27.0,
+      "Mid_Fr": 24.5,
+      "X_LCG_m": 12.3,
+      "Y_TCG_m": -4.32,
+      "Z_VCG_m": -0.74,
+      "Weight_MT": 13.77,
+      "Volume_m3": 15.8
+    },
+    {
+      "Tank_Name": "FODB1.S",
+      "Fr_Start": 22.0,
+      "Fr_End": 27.0,
+      "Mid_Fr": 24.5,
+      "X_LCG_m": 12.3,
+      "Y_TCG_m": 4.32,
+      "Z_VCG_m": -0.74,
+      "Weight_MT": 13.77,
+      "Volume_m3": 15.8
+    },
+    {
+      "Tank_Name": "FOW1.P",
+      "Fr_Start": 24.0,
+      "Fr_End": 27.0,
+      "Mid_Fr": 25.5,
+      "X_LCG_m": 13.16,
+      "Y_TCG_m": -6.25,
+      "Z_VCG_m": -2.32,
+      "Weight_MT": 10.39,
+      "Volume_m3": 11.9
+    },
+    {
+      "Tank_Name": "FOW1.S",
+      "Fr_Start": 24.0,
+      "Fr_End": 27.0,
+      "Mid_Fr": 25.5,
+      "X_LCG_m": 13.16,
+      "Y_TCG_m": 6.25,
+      "Z_VCG_m": -2.32,
+      "Weight_MT": 10.39,
+      "Volume_m3": 11.9
+    },
+    {
+      "Tank_Name": "LRFO.P",
+      "Fr_Start": 27.0,
+      "Fr_End": 33.0,
+      "Mid_Fr": 30.0,
+      "X_LCG_m": 19.5,
+      "Y_TCG_m": -3.92,
+      "Z_VCG_m": -1.91,
+      "Weight_MT": 154.89,
+      "Volume_m3": 178.0
+    },
+    {
+      "Tank_Name": "LRFO.S",
+      "Fr_Start": 27.0,
+      "Fr_End": 33.0,
+      "Mid_Fr": 30.0,
+      "X_LCG_m": 19.5,
+      "Y_TCG_m": 3.92,
+      "Z_VCG_m": -1.91,
+      "Weight_MT": 154.89,
+      "Volume_m3": 178.0
+    },
+    {
+      "Tank_Name": "FW1.P",
+      "Fr_Start": 6.0,
+      "Fr_End": 21.0,
+      "Mid_Fr": 13.5,
+      "X_LCG_m": 5.98,
+      "Y_TCG_m": -6.09,
+      "Z_VCG_m": -3.13,
+      "Weight_MT": 23.16,
+      "Volume_m3": 23.2
+    },
+    {
+      "Tank_Name": "FW1.S",
+      "Fr_Start": 6.0,
+      "Fr_End": 21.0,
+      "Mid_Fr": 13.5,
+      "X_LCG_m": 5.98,
+      "Y_TCG_m": 6.09,
+      "Z_VCG_m": -3.13,
+      "Weight_MT": 23.16,
+      "Volume_m3": 23.2
+    },
+    {
+      "Tank_Name": "FW2.P",
+      "Fr_Start": 0.0,
+      "Fr_End": 6.0,
+      "Mid_Fr": 3.0,
+      "X_LCG_m": 0.12,
+      "Y_TCG_m": -4.69,
+      "Z_VCG_m": -3.54,
+      "Weight_MT": 13.92,
+      "Volume_m3": 13.9
+    },
+    {
+      "Tank_Name": "FW2.S",
+      "Fr_Start": 0.0,
+      "Fr_End": 6.0,
+      "Mid_Fr": 3.0,
+      "X_LCG_m": 0.12,
+      "Y_TCG_m": 4.69,
+      "Z_VCG_m": -3.54,
+      "Weight_MT": 13.92,
+      "Volume_m3": 13.9
+    },
+    {
+      "Tank_Name": "FWCARGO1.P",
+      "Fr_Start": 43.0,
+      "Fr_End": 48.0,
+      "Mid_Fr": 45.5,
+      "X_LCG_m": 42.75,
+      "Y_TCG_m": -3.92,
+      "Z_VCG_m": -1.91,
+      "Weight_MT": 148.35,
+      "Volume_m3": 148.4
+    },
+    {
+      "Tank_Name": "FWCARGO1.S",
+      "Fr_Start": 43.0,
+      "Fr_End": 48.0,
+      "Mid_Fr": 45.5,
+      "X_LCG_m": 42.75,
+      "Y_TCG_m": 3.92,
+      "Z_VCG_m": -1.91,
+      "Weight_MT": 148.35,
+      "Volume_m3": 148.4
+    },
+    {
+      "Tank_Name": "FWCARGO2.P",
+      "Fr_Start": 38.0,
+      "Fr_End": 43.0,
+      "Mid_Fr": 40.5,
+      "X_LCG_m": 35.25,
+      "Y_TCG_m": -3.92,
+      "Z_VCG_m": -1.91,
+      "Weight_MT": 148.36,
+      "Volume_m3": 148.4
+    },
+    {
+      "Tank_Name": "FWCARGO2.S",
+      "Fr_Start": 38.0,
+      "Fr_End": 43.0,
+      "Mid_Fr": 40.5,
+      "X_LCG_m": 35.25,
+      "Y_TCG_m": 3.92,
+      "Z_VCG_m": -1.91,
+      "Weight_MT": 148.36,
+      "Volume_m3": 148.4
+    },
+    {
+      "Tank_Name": "FWB1.P",
+      "Fr_Start": 56.0,
+      "Fr_End": 65.0,
+      "Mid_Fr": 60.5,
+      "X_LCG_m": 57.52,
+      "Y_TCG_m": -2.38,
+      "Z_VCG_m": -2.49,
+      "Weight_MT": 50.57,
+      "Volume_m3": 50.6
+    },
+    {
+      "Tank_Name": "FWB1.S",
+      "Fr_Start": 56.0,
+      "Fr_End": 65.0,
+      "Mid_Fr": 60.5,
+      "X_LCG_m": 57.52,
+      "Y_TCG_m": 2.38,
+      "Z_VCG_m": -2.49,
+      "Weight_MT": 50.57,
+      "Volume_m3": 50.6
+    },
+    {
+      "Tank_Name": "FWB2.P",
+      "Fr_Start": 48.0,
+      "Fr_End": 53.0,
+      "Mid_Fr": 50.5,
+      "X_LCG_m": 50.04,
+      "Y_TCG_m": -4.37,
+      "Z_VCG_m": -2.06,
+      "Weight_MT": 109.98,
+      "Volume_m3": 110.0
+    },
+    {
+      "Tank_Name": "FWB2.S",
+      "Fr_Start": 48.0,
+      "Fr_End": 53.0,
+      "Mid_Fr": 50.5,
+      "X_LCG_m": 50.04,
+      "Y_TCG_m": 4.37,
+      "Z_VCG_m": -2.06,
+      "Weight_MT": 109.98,
+      "Volume_m3": 110.0
+    },
+    {
+      "Tank_Name": "CL.P",
+      "Fr_Start": 56.0,
+      "Fr_End": 59.0,
+      "Mid_Fr": 57.5,
+      "X_LCG_m": 56.25,
+      "Y_TCG_m": -4.75,
+      "Z_VCG_m": -4.23,
+      "Weight_MT": 7.12,
+      "Volume_m3": 6.9
+    },
+    {
+      "Tank_Name": "CL.S",
+      "Fr_Start": 56.0,
+      "Fr_End": 59.0,
+      "Mid_Fr": 57.5,
+      "X_LCG_m": 56.25,
+      "Y_TCG_m": 4.75,
+      "Z_VCG_m": -4.23,
+      "Weight_MT": 7.12,
+      "Volume_m3": 6.9
+    },
+    {
+      "Tank_Name": "VOID3.P",
+      "Fr_Start": 33.0,
+      "Fr_End": 38.0,
+      "Mid_Fr": 35.5,
+      "X_LCG_m": 27.75,
+      "Y_TCG_m": -3.92,
+      "Z_VCG_m": -1.91,
+      "Weight_MT": 152.08,
+      "Volume_m3": 148.4
+    },
+    {
+      "Tank_Name": "VOID3.S",
+      "Fr_Start": 33.0,
+      "Fr_End": 38.0,
+      "Mid_Fr": 35.5,
+      "X_LCG_m": 27.75,
+      "Y_TCG_m": 3.92,
+      "Z_VCG_m": -1.91,
+      "Weight_MT": 152.08,
+      "Volume_m3": 148.4
+    },
+    {
+      "Tank_Name": "SLUDGE.C",
+      "Fr_Start": 19.0,
+      "Fr_End": 22.0,
+      "Mid_Fr": 20.5,
+      "X_LCG_m": 8.79,
+      "Y_TCG_m": 0.0,
+      "Z_VCG_m": -1.08,
+      "Weight_MT": 5.42,
+      "Volume_m3": 6.2
+    },
+    {
+      "Tank_Name": "SEWAGE.P",
+      "Fr_Start": 19.0,
+      "Fr_End": 22.0,
+      "Mid_Fr": 20.5,
+      "X_LCG_m": 8.85,
+      "Y_TCG_m": -4.11,
+      "Z_VCG_m": -1.14,
+      "Weight_MT": 2.73,
+      "Volume_m3": 2.7
+    }
+  ]
+}

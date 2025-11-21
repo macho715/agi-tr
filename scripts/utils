@@ -1,0 +1,451 @@
+# -*- coding: utf-8 -*-
+# pdf_to_excel_converter.py
+# Converts PDF reports to Excel format with Constants and Hourly sheets
+
+import os
+import sys
+import re
+from datetime import datetime
+import pdfplumber
+from openpyxl import Workbook
+from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+from openpyxl.utils import get_column_letter
+
+# PDF 파일 경로
+PDF_FILES = {
+    "mammoet": "MAMMOET_PACKAGE/01_PDF_Report/LCT_BUSHRA_FWD_AFT_Report_for_Mammoet.pdf",
+    "root": "../LCT_BUSHRA_FWD_AFT_Report.pdf",
+    "submission": "SUBMISSION_PACKAGE/01_PDF_Report/LCT_BUSHRA_FWD_AFT_Report.pdf"
+}
+
+# 스타일 정의
+hdr_font = Font(name="Calibri", size=11, bold=True, color="FFFFFF")
+title_font = Font(name="Calibri", size=14, bold=True)
+sec_font = Font(name="Calibri", size=11, bold=True)
+header_fill = PatternFill("solid", fgColor="1F4E78")
+input_fill = PatternFill("solid", fgColor="FFF2CC")
+calc_fill = PatternFill("solid", fgColor="E7E6E6")
+thin = Side(border_style="thin", color="C0C0C0")
+border = Border(left=thin, right=thin, top=thin, bottom=thin)
+center = Alignment(horizontal="center", vertical="center", wrap_text=True)
+
+def safe_float(value, default=0.0):
+    """Safely convert value to float"""
+    if value is None:
+        return default
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+def extract_constants_from_text(text):
+    """Extract constants from PDF text using regex patterns"""
+    constants = {}
+    
+    # K-Z Distance
+    pattern = r"K[–-]Z\s+Distance\s*\(measured\):\s*([\d.]+)\s*m"
+    match = re.search(pattern, text, re.IGNORECASE)
+    if match:
+        constants["KminusZ_m"] = safe_float(match.group(1))
+    
+    # Linkspan Length
+    pattern = r"Linkspan\s+Length:\s*([\d.]+)\s*m"
+    match = re.search(pattern, text, re.IGNORECASE)
+    if match:
+        constants["L_ramp_m"] = safe_float(match.group(1))
+    
+    # Maximum Ramp Angle
+    pattern = r"Maximum\s+Ramp\s+Angle:\s*([\d.]+)\s*°"
+    match = re.search(pattern, text, re.IGNORECASE)
+    if match:
+        constants["theta_max_deg"] = safe_float(match.group(1))
+    
+    # Vessel Molded Depth - Enhanced patterns for RoRo Simulation and Stability Booklet
+    # Verified sources:
+    # 1. RoRo Simulation_stowage plan_20251103.pdf: "DEPTH (m) 3.65" (LCT SPECIFICATION)
+    # 2. Vessel_Stability_Booklet.pdf: "Moulded Depth 3.65 m" (Principal Particulars)
+    # Cross-verified: 5/5 documents match (Mammoet RoRo Simulation 4 copies + Stability Booklet)
+    depth_patterns = [
+        # RoRo Simulation pattern: "DEPTH (m) 3.65"
+        r"DEPTH\s*\(m\)\s*[:=]?\s*([\d.]+)",
+        r"DEPTH\s*\(m\)\s+([\d.]+)",
+        r"LCT\s+SPECIFICATION.*?DEPTH.*?\(m\)\s*[:=]?\s*([\d.]+)",
+        
+        # Stability Booklet pattern: "Moulded Depth 3.65 m" or "Moulded Depth: 3.65 m"
+        r"Moulded\s+Depth\s*[:=]?\s*([\d.]+)\s*m",
+        r"Moulded\s+Depth\s+([\d.]+)\s*metres?",
+        r"Moulded\s+Depth\s*[:=]?\s*([\d.]+)",
+        
+        # Principal Particulars table patterns
+        r"Principal\s+Particulars.*?Moulded\s+Depth\s*[:=]?\s*([\d.]+)\s*m",
+        r"Principal\s+Particulars.*?Depth\s+([\d.]+)\s*m",
+        
+        # Existing patterns (keep for backward compatibility)
+        r"Vessel\s+Molded\s+Depth:\s*([\d.]+)\s*m",
+        r"Vessel\s+Depth:\s*([\d.]+)\s*m",
+    ]
+    
+    # Try all patterns and collect matches
+    depth_matches = []
+    for pattern in depth_patterns:
+        matches = re.finditer(pattern, text, re.IGNORECASE | re.DOTALL)
+        for match in matches:
+            value = safe_float(match.group(1))
+            # Validate range (reasonable vessel depth: 2.0m to 10.0m)
+            if 2.0 <= value <= 10.0:
+                depth_matches.append({
+                    'value': value,
+                    'pattern': pattern,
+                    'match': match.group(0),
+                    'context': text[max(0, match.start()-50):min(len(text), match.end()+50)].replace('\n', ' ').strip()
+                })
+    
+    # Use the most common value if multiple matches found
+    if depth_matches:
+        # Count occurrences of each value
+        value_counts = {}
+        for m in depth_matches:
+            val = m['value']
+            value_counts[val] = value_counts.get(val, 0) + 1
+        
+        # Use the most common value
+        most_common_value = max(value_counts.items(), key=lambda x: x[1])[0]
+        constants["D_vessel_m"] = most_common_value
+        constants["_D_vessel_m_source"] = {
+            'value': most_common_value,
+            'matches_count': len([m for m in depth_matches if m['value'] == most_common_value]),
+            'total_matches': len(depth_matches),
+            'patterns_used': list(set([m['pattern'] for m in depth_matches if m['value'] == most_common_value]))
+        }
+    
+    # Length Between Perpendiculars
+    pattern = r"Length\s+Between\s+Perpendiculars:\s*([\d.]+)\s*m"
+    match = re.search(pattern, text, re.IGNORECASE)
+    if match:
+        constants["Lpp_m"] = safe_float(match.group(1))
+    
+    # Draft Range
+    pattern = r"Draft\s+Range\s*\(Operational\):\s*([\d.]+)\s*-\s*([\d.]+)\s*m"
+    match = re.search(pattern, text, re.IGNORECASE)
+    if match:
+        constants["min_fwd_draft_m"] = safe_float(match.group(1))
+        constants["max_fwd_draft_m"] = safe_float(match.group(2))
+    
+    # 기본값 설정 (추출 실패 시)
+    defaults = {
+        "KminusZ_m": 3.0,
+        "L_ramp_m": 12.0,
+        "theta_max_deg": 6.0,
+        "D_vessel_m": 3.65,  # LCT Bushra Moulded Depth: 3.65m (verified)
+        # Source: RoRo Simulation_stowage plan_20251103.pdf (LCT SPECIFICATION: DEPTH (m) 3.65)
+        #         Vessel_Stability_Booklet.pdf (Principal Particulars: Moulded Depth 3.65 m)
+        #         Cross-verified: 5/5 documents match (Mammoet RoRo Simulation 4 copies + Stability Booklet)
+        #         Previous value 4.85m: No evidence found in submitted documents
+        "Lpp_m": 60.302,  # Verified: Length between perpendiculars
+        "min_fwd_draft_m": 1.5,
+        "max_fwd_draft_m": 3.5,
+    }
+    
+    for key, default_val in defaults.items():
+        if key not in constants:
+            constants[key] = default_val
+    
+    return constants
+
+def extract_hourly_data_from_tables(pdf):
+    """Extract hourly data from PDF tables"""
+    hourly_data = []
+    
+    for page in pdf.pages:
+        tables = page.extract_tables()
+        
+        for table in tables:
+            if not table or len(table) < 2:
+                continue
+            
+            # 헤더 확인 (Date, Time, Tide 등이 포함된 테이블 찾기)
+            header_row = table[0]
+            if not any(col and ("Date" in str(col) or "Time" in str(col) or "Tide" in str(col)) for col in header_row):
+                continue
+            
+            # 헤더 인덱스 찾기
+            header_map = {}
+            for idx, col in enumerate(header_row):
+                if col:
+                    col_str = str(col).strip()
+                    if "Date" in col_str:
+                        header_map["date"] = idx
+                    elif "Time" in col_str:
+                        header_map["time"] = idx
+                    elif "Tide" in col_str:
+                        header_map["tide"] = idx
+                    elif "Dfwd" in col_str or "Dfwd_req" in col_str:
+                        header_map["dfwd_req"] = idx
+                    elif "Daft" in col_str or "Daft_req" in col_str or "Daft_adj" in col_str:
+                        header_map["daft_adj"] = idx
+                    elif "Trim" in col_str:
+                        header_map["trim"] = idx
+                    elif "Ramp" in col_str or "Angle" in col_str:
+                        header_map["angle"] = idx
+                    elif "Status" in col_str:
+                        header_map["status"] = idx
+                    elif "Remark" in col_str or "Notes" in col_str:
+                        header_map["notes"] = idx
+            
+            # 데이터 행 처리
+            for row in table[1:]:
+                if not row or len(row) < 3:
+                    continue
+                
+                # Date와 Time 추출
+                date_str = ""
+                time_str = ""
+                if "date" in header_map and header_map["date"] < len(row):
+                    date_str = str(row[header_map["date"]]).strip() if row[header_map["date"]] else ""
+                if "time" in header_map and header_map["time"] < len(row):
+                    time_str = str(row[header_map["time"]]).strip() if row[header_map["time"]] else ""
+                
+                # DateTime 조합
+                datetime_str = ""
+                if date_str and time_str:
+                    datetime_str = f"{date_str} {time_str}"
+                elif date_str:
+                    datetime_str = date_str
+                elif time_str:
+                    datetime_str = time_str
+                
+                if not datetime_str:
+                    continue
+                
+                # 데이터 추출
+                record = {
+                    "datetime": datetime_str,
+                    "tide": safe_float(row[header_map.get("tide", 0)]) if "tide" in header_map and header_map["tide"] < len(row) else None,
+                    "dfwd_req": safe_float(row[header_map.get("dfwd_req", 0)]) if "dfwd_req" in header_map and header_map["dfwd_req"] < len(row) else None,
+                    "daft_adj": safe_float(row[header_map.get("daft_adj", 0)]) if "daft_adj" in header_map and header_map["daft_adj"] < len(row) else None,
+                    "trim": safe_float(row[header_map.get("trim", 0)]) if "trim" in header_map and header_map["trim"] < len(row) else 0,
+                    "angle": safe_float(row[header_map.get("angle", 0)]) if "angle" in header_map and header_map["angle"] < len(row) else None,
+                    "status": str(row[header_map.get("status", 0)]).strip() if "status" in header_map and header_map["status"] < len(row) and row[header_map["status"]] else "",
+                    "notes": str(row[header_map.get("notes", 0)]).strip() if "notes" in header_map and header_map["notes"] < len(row) and row[header_map["notes"]] else "",
+                }
+                
+                # Trim 처리 (Even-keel 문자열 처리)
+                if "trim" in header_map and header_map["trim"] < len(row):
+                    trim_val = row[header_map["trim"]]
+                    if trim_val and isinstance(trim_val, str) and "Even" in trim_val:
+                        record["trim"] = 0
+                
+                hourly_data.append(record)
+    
+    return hourly_data
+
+def create_constants_sheet(wb, constants):
+    """Create Constants sheet similar to Calc sheet"""
+    ws = wb.create_sheet("Constants")
+    
+    # Title
+    ws["A1"] = "LCT BUSHRA — Constants (Extracted from PDF)"
+    ws["A1"].font = title_font
+    ws.merge_cells("A1:E1")
+    
+    # Headers
+    headers = ["SECTION", "PARAMETER", "UNIT", "VALUE", "NOTES"]
+    for col, h in enumerate(headers, 1):
+        c = ws.cell(row=2, column=col, value=h)
+        c.font = hdr_font
+        c.fill = header_fill
+        c.alignment = center
+        c.border = border
+    
+    r = 4
+    ws.cell(row=r, column=1, value="INPUT CONSTANTS").font = sec_font
+    
+    # Constants
+    params = [
+        ("L_ramp_m", "m", constants.get("L_ramp_m", 12.0), "Linkspan length"),
+        ("theta_max_deg", "deg", constants.get("theta_max_deg", 6.0), "Max ramp angle"),
+        ("KminusZ_m", "m", constants.get("KminusZ_m", 3.0), "K - Z (from PDF)"),
+        ("D_vessel_m", "m", constants.get("D_vessel_m", 3.65), 
+         "Moulded Depth 3.65m (verified: RoRo Simulation & Stability Booklet, 5/5 documents match)"),
+    ]
+    
+    for param, unit, val, note in params:
+        ws.cell(row=r, column=2, value=param)
+        ws.cell(row=r, column=3, value=unit)
+        ws.cell(row=r, column=4, value=val).fill = input_fill
+        ws.cell(row=r, column=5, value=note)
+        for c in range(1, 6):
+            ws.cell(row=r, column=c).border = border
+        r += 1
+    
+    r += 1
+    
+    # Limits
+    ws.cell(row=r, column=1, value="LIMITS").font = sec_font
+    params2 = [
+        ("min_fwd_draft_m", "m", constants.get("min_fwd_draft_m", 1.5), "Min draft"),
+        ("max_fwd_draft_m", "m", constants.get("max_fwd_draft_m", 3.5), "Max draft"),
+    ]
+    
+    for param, unit, val, note in params2:
+        ws.cell(row=r, column=2, value=param)
+        ws.cell(row=r, column=3, value=unit)
+        ws.cell(row=r, column=4, value=val).fill = input_fill
+        ws.cell(row=r, column=5, value=note)
+        for c in range(1, 6):
+            ws.cell(row=r, column=c).border = border
+        r += 1
+    
+    r += 1
+    
+    # Stability
+    ws.cell(row=r, column=1, value="STABILITY").font = sec_font
+    if "Lpp_m" in constants:
+        params3 = [
+            ("Lpp_m", "m", constants.get("Lpp_m", 60.302), "Length between perpendiculars (Verified)"),
+        ]
+        
+        for param, unit, val, note in params3:
+            ws.cell(row=r, column=2, value=param)
+            ws.cell(row=r, column=3, value=unit)
+            ws.cell(row=r, column=4, value=val).fill = input_fill
+            ws.cell(row=r, column=5, value=note)
+            for c in range(1, 6):
+                ws.cell(row=r, column=c).border = border
+            r += 1
+    
+    # Column widths
+    for i, w in zip(range(1, 6), [26, 24, 10, 12, 70]):
+        ws.column_dimensions[get_column_letter(i)].width = w
+
+def create_hourly_sheet(wb, hourly_data):
+    """Create Hourly_FWD_AFT_Heights sheet"""
+    ws = wb.create_sheet("Hourly_FWD_AFT_Heights")
+    
+    # Headers
+    headers = [
+        "DateTime (GST)", "Tide_m", "Dfwd_req_m", "Trim_m",
+        "Dfwd_adj_m", "Daft_adj_m", "Ramp_Angle_deg", "Status", "Notes"
+    ]
+    
+    for col, h in enumerate(headers, 1):
+        c = ws.cell(row=1, column=col, value=h)
+        c.font = hdr_font
+        c.fill = header_fill
+        c.alignment = center
+        c.border = border
+    
+    # Data rows
+    for idx, record in enumerate(hourly_data, start=2):
+        ws.cell(row=idx, column=1, value=record["datetime"])
+        ws.cell(row=idx, column=2, value=record["tide"] if record["tide"] is not None else "")
+        ws.cell(row=idx, column=3, value=record["dfwd_req"] if record["dfwd_req"] is not None else "")
+        ws.cell(row=idx, column=4, value=record["trim"] if record["trim"] != 0 else "")
+        ws.cell(row=idx, column=5, value=record["dfwd_req"] if record["dfwd_req"] is not None else "")  # Dfwd_adj = Dfwd_req if no trim
+        ws.cell(row=idx, column=6, value=record["daft_adj"] if record["daft_adj"] is not None else "")
+        ws.cell(row=idx, column=7, value=record["angle"] if record["angle"] is not None else "")
+        ws.cell(row=idx, column=8, value=record["status"])
+        ws.cell(row=idx, column=9, value=record["notes"])
+        
+        # Apply borders
+        for c in range(1, 10):
+            ws.cell(row=idx, column=c).border = border
+        
+        # Status color coding
+        if record["status"] == "OK":
+            ws.cell(row=idx, column=8).fill = PatternFill("solid", fgColor="90EE90")
+        elif record["status"] == "CHECK":
+            ws.cell(row=idx, column=8).fill = PatternFill("solid", fgColor="FFD700")
+    
+    # Column widths
+    widths = [22, 10, 12, 10, 12, 12, 14, 10, 28]
+    for col, w in zip(range(1, 10), widths):
+        ws.column_dimensions[get_column_letter(col)].width = w
+
+def convert_pdf_to_excel(pdf_path, output_path):
+    """Convert PDF to Excel"""
+    print(f"\nProcessing: {pdf_path}")
+    
+    if not os.path.exists(pdf_path):
+        print(f"✗ ERROR: PDF file not found: {pdf_path}")
+        return False
+    
+    try:
+        # Open PDF
+        with pdfplumber.open(pdf_path) as pdf:
+            # Extract text from all pages
+            full_text = ""
+            for page in pdf.pages:
+                full_text += page.extract_text() or ""
+            
+            # Extract constants
+            print("  → Extracting constants...")
+            constants = extract_constants_from_text(full_text)
+            print(f"    ✓ Found {len(constants)} constants")
+            
+            # Extract hourly data
+            print("  → Extracting hourly data from tables...")
+            hourly_data = extract_hourly_data_from_tables(pdf)
+            print(f"    ✓ Found {len(hourly_data)} hourly records")
+            
+            # Create Excel workbook
+            print("  → Creating Excel workbook...")
+            wb = Workbook()
+            wb.remove(wb.active)  # Remove default sheet
+            
+            # Create sheets
+            create_constants_sheet(wb, constants)
+            create_hourly_sheet(wb, hourly_data)
+            
+            # Save
+            wb.save(output_path)
+            print(f"  ✓ Excel saved: {output_path}")
+            return True
+    
+    except Exception as e:
+        print(f"✗ ERROR: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+
+def main():
+    """Main execution"""
+    print("="*70)
+    print("PDF to Excel Converter")
+    print("="*70)
+    print(f"Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+    
+    # Convert Mammoet PDF
+    mammoet_pdf = PDF_FILES["mammoet"]
+    mammoet_output = "LCT_BUSHRA_FWD_AFT_Report_from_PDF.xlsx"
+    
+    if os.path.exists(mammoet_pdf):
+        convert_pdf_to_excel(mammoet_pdf, mammoet_output)
+    else:
+        print(f"⚠ Skipping: {mammoet_pdf} (not found)")
+    
+    # Convert root PDF
+    root_pdf = PDF_FILES["root"]
+    root_output = "LCT_BUSHRA_FWD_AFT_Report_from_PDF_root.xlsx"
+    
+    if os.path.exists(root_pdf):
+        convert_pdf_to_excel(root_pdf, root_output)
+    else:
+        print(f"⚠ Skipping: {root_pdf} (not found)")
+    
+    # Convert submission PDF
+    submission_pdf = PDF_FILES["submission"]
+    submission_output = "LCT_BUSHRA_FWD_AFT_Report_from_PDF_submission.xlsx"
+    
+    if os.path.exists(submission_pdf):
+        convert_pdf_to_excel(submission_pdf, submission_output)
+    else:
+        print(f"⚠ Skipping: {submission_pdf} (not found)")
+    
+    print("\n" + "="*70)
+    print("Conversion complete!")
+    print("="*70)
+
+if __name__ == "__main__":
+    main()
+

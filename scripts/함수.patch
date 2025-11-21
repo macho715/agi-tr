@@ -1,0 +1,189 @@
+좋다 — 문제 원인과 **구체적·실행 가능한 수정안**을 바로 줍니다. 짧고 정확하게:
+핵심은 **(1) Hourly 시트에서는 `Daft_req = Dfwd_req`(even-keel)가 기본**이고 그래서 FWD/AFT 높이가 같게 나오는 건 의도된 동작이고, **(2) Stage 시트에서 트림을 반영해 Dfwd/Daft를 계산해야 FWD/AFT가 달라진다**는 점입니다.
+그리고 파일들마다 `Calc` 셀 매핑이 달라 헷갈리니, **INDEX/MATCH 방식으로 동적 참조**하도록 바꾸는 걸 강력 추천합니다. 그러면 D셀 번호가 바뀌어도 수식이 깨지지 않습니다.
+
+아래는 (A) 문제 원인 요약, (B) 권장 수정(구체 수식), (C) Ballast 계산 정리, (D) 적용(수식 붙여넣기) 순서로 제공합니다. 원하면 이 수식들을 반영한 **수정된 Python 스크립트**(엑셀 생성)를 바로 만들어 드릴게요 — 그건 마지막에 물어봅니다(한 줄 질문).
+
+---
+
+# A — 문제 원인 (요약)
+
+* 현재 `Hourly_FWD_AFT_Heights`에서 `Daft_req`가 `Dfwd_req`와 동일하게 설정되어 있음(= even-keel).
+  → 그래서 `FWD_Height_m`과 `AFT_Height_m`이 동일하게 보임(정상 동작).
+* 실제로 **스테이지별 트림을 반영**하려면 `RORO_Stage_Scenarios`에서 `Trim`을 계산하고 거기서 Dfwd/Daft를 따로 계산해야 함.
+* 또 파일별로 `Calc` 시트의 상수(D셀 위치)가 달라 수식 참조가 엉키는 일이 발생. → **동적 참조 필요**.
+
+---
+
+# B — 권장 수정 (안정적 · 유지보수 용이)
+
+모든 수식은 **`INDEX/MATCH`**로 Calc 시트에서 이름(예: `"KminusZ_m"`)을 찾아 값을 가져오도록 합니다.
+아래는 복사해서 Excel에 붙여넣을 수식(한 행 기준: 행 번호 2 대신 실제 행 사용).
+
+### 1) Hourly_FWD_AFT_Heights (행 2용 예시)
+
+(이 방식이면 Calc!D 위치가 바뀌어도 깨지지 않습니다.)
+
+* `C2` (Dfwd_req_m):
+
+```
+=IF($A2="","",
+  INDEX(Calc!$D:$D, MATCH("KminusZ_m", Calc!$B:$B, 0))
+  + $B2
+  - INDEX(Calc!$D:$D, MATCH("L_ramp_m", Calc!$B:$B, 0))
+    * TAN(RADIANS( INDEX(Calc!$D:$D, MATCH("theta_max_deg", Calc!$B:$B, 0)) ))
+)
+```
+
+* `D2` (Daft_req_m) — 기본 even-keel 유지:
+
+```
+=IF(C2="","", C2)
+```
+
+(원하면 여기서 별도 트림 보정 참조로 변경 가능 — 아래 참고)
+
+* `F2` (Ramp_Angle_deg):
+
+```
+=IF(C2="","",
+  DEGREES( ATAN(
+    ( INDEX(Calc!$D:$D, MATCH("KminusZ_m", Calc!$B:$B,0)) - C2 + $B2 )
+    / INDEX(Calc!$D:$D, MATCH("L_ramp_m", Calc!$B:$B,0))
+  ))
+)
+```
+
+* `E2` (Status):
+
+```
+=IF(C2="","",
+  IF( AND(
+    C2 >= INDEX(Calc!$D:$D, MATCH("min_fwd_draft_m", Calc!$B:$B,0)),
+    C2 <= INDEX(Calc!$D:$D, MATCH("max_fwd_draft_m", Calc!$B:$B,0)),
+    F2 <= INDEX(Calc!$D:$D, MATCH("theta_max_deg", Calc!$B:$B,0))
+  ), "OK", "CHECK")
+)
+```
+
+* `G2` (FWD_Height_m):
+
+```
+=IF(C2="","", INDEX(Calc!$D:$D, MATCH("D_vessel_m", Calc!$B:$B,0)) - C2 + $B2 )
+```
+
+* `H2` (AFT_Height_m):
+
+```
+=IF(D2="","", INDEX(Calc!$D:$D, MATCH("D_vessel_m", Calc!$B:$B,0)) - D2 + $B2 )
+```
+
+> 요점: Hourly은 **시간/조위에 기반한 목표 흘수(=Dfwd_req)**와 계산 각도/상태/높이를 내는 시트입니다. 트림(스테이지별)은 Stage 시트에서 반영.
+
+---
+
+### 2) RORO_Stage_Scenarios (스테이지별 트림 반영)
+
+(행 r 예시, row 번호를 실제로 맞춰 붙여넣기)
+
+* `TM` (예: D13):
+
+```
+=IF(OR(B13="", C13=""), "",
+   B13 * ( C13 - INDEX(Calc!$D:$D, MATCH("LCF_m_from_midship", Calc!$B:$B,0)) )
+)
+```
+
+* `Trim_cm` (E13):
+
+```
+=IF(OR(D13="", INDEX(Calc!$D:$D, MATCH("MTC_t_m_per_cm", Calc!$B:$B,0))=0), "",
+   D13 / INDEX(Calc!$D:$D, MATCH("MTC_t_m_per_cm", Calc!$B:$B,0))
+)
+```
+
+* `Trim_m` (F13):
+
+```
+=IF(E13="","", E13/100)
+```
+
+* `Dfwd` (G13):
+
+```
+=IF(OR($C$4="", F13=""), "", $C$4 - F13/2)
+```
+
+* `Daft` (H13):
+
+```
+=IF(OR($C$4="", F13=""), "", $C$4 + F13/2)
+```
+
+* `FWD_Height` (I13):
+
+```
+=IF(G13="","", INDEX(Calc!$D:$D, MATCH("D_vessel_m", Calc!$B:$B,0)) - G13 + $C$4)
+```
+
+* `AFT_Height` (J13):
+
+```
+=IF(H13="","", INDEX(Calc!$D:$D, MATCH("D_vessel_m", Calc!$B:$B,0)) - H13 + $C$4)
+```
+
+---
+
+# C — Ballast 계산(명확화 + 추천 공식)
+
+지금 이 부분이 가장 혼란스러웠습니다. 명확히 하자면:
+
+* `TPC`(t/cm) : 단위가 t/cm 이므로 **t/m 으로 바꾸려면 `TPC*100`** 을 곱합니다.
+* **Ballast(t)** 를 “평균 흘수(mean draft)를 ΔT 만큼 바꾸기 위해 필요한 질량”으로 정의하면:
+
+```
+Ballast_t = ABS( ΔT_m ) * ( TPC_t_per_cm * 100 )
+```
+
+(예: ΔT_m = 0.10m, TPC=7.5 t/cm → Ballast ≈ 0.10 * 7.5 *100 = 75.0 t)
+
+**문제였던 식들**
+
+* `ABS(Trim_m) * 50 * TPC` 같은 식은 근거가 불분명(항길/레버 등 가정 없이 절대값 곱 50은 임의값).
+* `ABS(Trim_cm) * something` 도 단위 혼동 유발.
+
+**권장(간단·투명) 방식**
+
+1. 사용자가 “변경하고자 하는 mean draft 차이(Δmean_m)”를 입력할 수 있는 열(예: `K: Δmean_m`)을 둔다.
+2. Ballast_t 열에:
+
+```
+=IF(K13="", "", ABS(K13) * INDEX(Calc!$D:$D, MATCH("TPC_t_per_cm",Calc!$B:$B,0)) * 100)
+```
+
+3. Ballast_time_h:
+
+```
+=IF(I13="", "", I13 / INDEX(Calc!$D:$D, MATCH("pump_rate_tph",Calc!$B:$B,0)) )
+```
+
+(여기서 I13은 Ballast_t 셀 주소 예시)
+
+**대체(자동) 옵션**
+
+* 만약 자동으로 “스테이지에서 발생한 mean draft 변화”를 이용해 Ballast 계산을 원하면, 계산 근거(어떤 무게를 싣거나 뺄 때 mean draft가 얼마나 변하는지에 대한 식)를 명확히 해야 하므로 추가 정보 필요합니다. 간단히 자동화하려면 `Δmean ≈ W_stage / (TPC*100)` 을 쓸 수 있지만 — 이 식은 *그 스테이지에서 들어간 총 중량이 단독으로 mean draft를 바꿀 때*만 유효(트림/레버 영향 무시).
+
+결론: **투명하고 검증 가능한 방식**은 “사용자가 목표 Δmean 을 입력 → Ballast 계산”입니다. 자동 추정은 엔지니어상 근거를 명시해야 안전합니다.
+
+---
+
+# D — 적용 방법(직접 수정용 요약)
+
+1. **Houry 시트**: `C/F/G/H/E` 열을 위의 INDEX/MATCH 수식으로 바꿔 붙여넣기. (행 2→아래로 드래그)
+2. **Stage 시트**: TM/Trim/Dfwd/Daft/FWD_Height/AFT_Height 수식을 위대로 바꾼다.
+3. **Ballast**: 위의 “권장 방식”(사용자 입력 Δmean → Ballast_t = Δmean * TPC*100)을 추천.
+4. **Calc 시트**: 각 파라미터 이름(예: `B`열에 `"KminusZ_m"` 등)을 반드시 넣어두고 값은 `D`열에 둔다. (INDEX/MATCH가 이름으로 찾음)
+
+   * 예: `Calc!B?` 열에 파라미터 이름 정리: `L_ramp_m, theta_max_deg, KminusZ_m, D_vessel_m, min_fwd_draft_m, max_fwd_draft_m, pump_rate_tph, MTC_t_m_per_cm, LCF_m_from_midship, TPC_t_per_cm`
+
+---

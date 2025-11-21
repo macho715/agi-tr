@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LCT BUSHRA Simulator v26 (Quay Alignment Fix)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .font-mono { font-family: 'JetBrains Mono', monospace; }
+        
+        /* Transitions */
+        .transition-physics { transition: all 1.2s cubic-bezier(0.25, 1, 0.5, 1); }
+        .transition-opacity { transition: opacity 0.5s ease-in-out; }
+        
+        .bg-deep-ocean { background-color: #0f172a; } 
+        .grid-pattern {
+            background-image: 
+                linear-gradient(to right, #1e293b 1px, transparent 1px),
+                linear-gradient(to bottom, #1e293b 1px, transparent 1px);
+            background-size: 40px 40px;
+        }
+
+        /* Water Animation (Synced to Y=400) */
+        @keyframes wave {
+            0% { background-position: 0 0; }
+            100% { background-position: 50px 0; }
+        }
+        .water-surface {
+            background: url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI1MCIgaGVpZ2h0PSIyMCIgdmlld0JveD0iMCAwIDUwIDIwIiBmaWxsPSJub25lIiBzdHJva2U9IiMzYjgyZjYiIHN0cm9rZS13aWR0aD0iMiI+PHBhdGggZD0iTTAgMTBRMTIuNSAwIDI1IDEwVDUwIDEwIiAvPjwvc3ZnPg==');
+            animation: wave 2s linear infinite;
+            opacity: 0.5;
+        }
+        
+        .hazard-pattern { fill: url(#hazard); }
+    </style>
+</head>
+
+<body class="bg-slate-950 text-white h-screen flex flex-col overflow-hidden">
+
+    <div class="flex justify-between items-center p-4 border-b border-slate-800 bg-slate-900/80 backdrop-blur z-20">
+        <div class="flex items-center gap-4">
+            <div class="bg-indigo-600 p-2 rounded-lg shadow-lg shadow-indigo-500/20">
+                <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>
+            </div>
+            <div>
+                <h1 class="text-xl font-bold text-white tracking-tight">LCT BUSHRA Simulator v26</h1>
+                <div class="flex gap-4 mt-1 text-[10px] font-mono text-slate-400">
+                    <span class="flex items-center gap-1"><span class="w-1 h-1 bg-indigo-500 rounded-full"></span>Quay Level Aligned (Y=330)</span>
+                    <span class="flex items-center gap-1"><span class="w-1 h-1 bg-blue-500 rounded-full"></span>Perfect Horizontal Ramp</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="flex items-center gap-6">
+            <div id="day-indicator" class="px-4 py-1.5 rounded-full bg-slate-800 border border-slate-600 text-xs font-bold text-slate-300 tracking-widest transition-all">
+                PRE-OP
+            </div>
+            <button onclick="toggleAutoPlay()" id="play-btn" class="flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-all shadow-lg shadow-emerald-900/20 border border-emerald-500">
+                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" /></svg>
+                AUTO PLAY
+            </button>
+        </div>
+    </div>
+
+    <div class="flex-1 grid grid-cols-1 lg:grid-cols-4 gap-6 p-6 min-h-0 relative">
+        
+        <div class="lg:col-span-3 bg-deep-ocean rounded-2xl border border-slate-700 relative overflow-hidden grid-pattern shadow-2xl flex flex-col group">
+            
+            <div class="absolute inset-0 z-0 pointer-events-none">
+                <div class="h-full w-full bg-gradient-to-b from-slate-900/0 to-slate-900/80" style="margin-top: 400px;"></div> 
+                <div class="absolute top-[400px] left-0 w-full h-[1px] bg-blue-400 shadow-[0_0_15px_rgba(96,165,250,0.8)] z-10"></div>
+                <div class="absolute top-[400px] left-0 w-full h-6 water-surface z-10"></div>
+            </div>
+
+            <div class="relative z-10 w-full h-full flex items-center justify-center">
+                <svg viewBox="0 0 1600 600" class="w-full h-full overflow-visible">
+                    <defs>
+                        <pattern id="concrete" patternUnits="userSpaceOnUse" width="30" height="30">
+                            <rect width="30" height="30" fill="#1c1917" />
+                            <path d="M 0 30 L 30 0" stroke="#292524" stroke-width="2"/>
+                        </pattern>
+                        <pattern id="hazard" patternUnits="userSpaceOnUse" width="20" height="20" patternTransform="rotate(45)">
+                            <rect width="20" height="20" fill="#f59e0b"/>
+                            <rect width="10" height="20" fill="#b45309"/>
+                        </pattern>
+                        <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+                            <path d="M0,0 L0,6 L9,3 z" fill="#fbbf24" />
+                        </marker>
+                    </defs>
+
+                    <g id="env-layers">
+                        <line x1="0" y1="550" x2="1600" y2="550" stroke="#ef4444" stroke-width="1" stroke-dasharray="4,4" opacity="0.6" />
+                        <text x="1300" y="565" fill="#ef4444" font-size="12" font-mono font-bold>SEA BED</text>
+
+                        <text x="1300" y="390" fill="#3b82f6" font-size="12" font-mono font-bold>TIDE LEVEL (W.L.)</text>
+                        
+                        <g transform="translate(1250, 0)">
+                            <line x1="0" y1="550" x2="0" y2="480" stroke="#94a3b8" stroke-width="1" />
+                            <text x="-5" y="520" text-anchor="end" fill="#94a3b8" font-size="10" class="font-mono" transform="rotate(-90, -5, 520)">1100</text>
+                            <line x1="0" y1="480" x2="0" y2="400" stroke="#94a3b8" stroke-width="1" />
+                            <text x="-5" y="440" text-anchor="end" fill="#94a3b8" font-size="10" class="font-mono" transform="rotate(-90, -5, 440)">1550</text>
+                            
+                            <line x1="-5" y1="550" x2="5" y2="550" stroke="#94a3b8" stroke-width="1" />
+                            <line x1="-5" y1="480" x2="5" y2="480" stroke="#94a3b8" stroke-width="1" />
+                            <line x1="-5" y1="400" x2="5" y2="400" stroke="#94a3b8" stroke-width="1" />
+                        </g>
+                    </g>
+
+                    <g id="quay-static">
+                        <path d="M 1250,330 L 1500,330 L 1500,600 L 1250,600 Z" fill="url(#concrete)" stroke="#44403c" stroke-width="2" />
+                        <rect x="1240" y="340" width="10" height="140" fill="#334155" rx="2" />
+                        <text x="1280" y="550" fill="#57534e" font-size="24" font-weight="bold" class="font-mono">QUAY</text>
+                    </g>
+
+                    <g id="ship-group" class="transition-physics" transform-origin="580 100">
+                        
+                        <path d="M 100,0 L 1060,0 L 1060,146 L 150,146 L 100,100 Z" fill="#1e293b" stroke="#475569" stroke-width="2" />
+                        
+                        <g transform="translate(100, -100)">
+                            <path d="M 0,100 L 100,100 L 100,0 L 20,0 L 0,30 Z" fill="#f1f5f9" stroke="#94a3b8" stroke-width="1" />
+                            <rect x="15" y="50" width="25" height="20" fill="#334155" rx="2" />
+                        </g>
+
+                        <line x1="100" y1="0" x2="1060" y2="0" stroke="#10b981" stroke-width="3" />
+                        <text x="110" y="20" fill="#94a3b8" font-size="12" font-weight="bold" class="font-mono">AP (0m)</text>
+                        
+                        <circle id="bow-hinge" cx="1060" cy="0" r="5" fill="#fff" stroke="#b45309" stroke-width="2"/>
+
+                        <g id="tr1" class="transition-physics">
+                            <g transform="translate(-90, -50)"> 
+                                <rect x="45" y="0" width="90" height="45" fill="#3b82f6" fill-opacity="0.8" stroke="white" stroke-width="1" /> 
+                                <rect x="0" y="45" width="180" height="5" fill="#facc15" stroke="#b45309" />
+                                <text x="90" y="30" text-anchor="middle" fill="white" font-size="12" font-weight="bold">TM63 (01)</text>
+                            </g>
+                        </g>
+                        <g id="tr2" class="transition-physics">
+                            <g transform="translate(-90, -50)">
+                                <rect x="45" y="0" width="90" height="45" fill="#3b82f6" fill-opacity="0.8" stroke="white" stroke-width="1" /> 
+                                <rect x="0" y="45" width="180" height="5" fill="#facc15" stroke="#b45309" />
+                                <text x="90" y="30" text-anchor="middle" fill="white" font-size="12" font-weight="bold">TM63 (02)</text>
+                            </g>
+                        </g>
+
+                        <rect id="ballast-visual" x="150" y="100" width="150" height="0" fill="#0ea5e9" opacity="0.6" class="transition-all duration-1000" />
+                        <text id="ballast-text" x="225" y="90" text-anchor="middle" fill="#0ea5e9" font-size="10" font-bold opacity="0">AFT TANK</text>
+
+                        <g id="tug-assist" class="opacity-0 transition-opacity duration-700" transform="translate(600, 150)">
+                            <path d="M 0,0 L 60,0 L 50,30 L 10,30 Z" fill="#f59e0b" stroke="#b45309" stroke-width="2" />
+                            <rect x="15" y="-15" width="30" height="15" fill="#f1f5f9" stroke="#94a3b8" />
+                            <text x="30" y="20" text-anchor="middle" fill="#78350f" font-size="10" font-weight="bold">TUG</text>
+                        </g>
+
+                        <g id="cad-gap-dims" class="opacity-0 transition-opacity" transform="translate(0, -65)">
+                            <line id="dim-line" x1="0" y1="10" x2="0" y2="10" stroke="#fbbf24" stroke-width="2" marker-end="url(#arrow)" />
+                            <text id="dim-text" x="0" y="5" text-anchor="middle" fill="#fbbf24" font-size="14" font-weight="bold" class="font-mono">2.0m</text>
+                            <line id="dim-ext1" x1="0" y1="15" x2="0" y2="70" stroke="#fbbf24" stroke-width="1" stroke-dasharray="4,2" />
+                            <line id="dim-ext2" x1="0" y1="15" x2="0" y2="70" stroke="#fbbf24" stroke-width="1" stroke-dasharray="4,2" />
+                        </g>
+
+                    </g> 
+
+                    <g id="linkspan-dynamic" class="transition-physics">
+                        <line id="ls-line" x1="1060" y1="330" x2="1250" y2="330" stroke="url(#hazard)" stroke-width="12" stroke-linecap="round" />
+                        <circle id="ls-p1" cx="1060" cy="330" r="6" fill="#fff" stroke="#b45309" stroke-width="2" />
+                        <circle id="ls-p2" cx="1250" cy="330" r="6" fill="#fff" stroke="#b45309" stroke-width="2" />
+                    </g>
+
+                </svg>
+
+                <div class="absolute bottom-8 left-8 flex gap-6 pointer-events-none">
+                    <div class="bg-slate-900/90 backdrop-blur border border-slate-700 rounded-xl p-5 shadow-2xl pointer-events-auto">
+                        <div class="text-[10px] text-slate-500 uppercase tracking-widest mb-2 font-bold">Draft Readings (m)</div>
+                        <div class="flex gap-8 items-end">
+                            <div class="text-center">
+                                <div class="text-xs text-slate-400 mb-1">AFT</div>
+                                <div class="text-3xl font-mono font-bold text-blue-400" id="daft-display">2.00</div>
+                            </div>
+                            <div class="h-10 w-[1px] bg-slate-700"></div>
+                            <div class="text-center">
+                                <div class="text-xs text-slate-400 mb-1">FWD</div>
+                                <div class="text-3xl font-mono font-bold text-blue-400" id="dfwd-display">2.00</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-slate-900/90 backdrop-blur border border-slate-700 rounded-xl p-5 shadow-2xl min-w-[140px] pointer-events-auto">
+                        <div class="text-[10px] text-slate-500 uppercase tracking-widest mb-2 font-bold">Trim Status</div>
+                        <div class="text-3xl font-mono font-bold text-white mb-1" id="trim-display">0.00 m</div>
+                        <div class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-slate-800 text-[10px] font-bold text-emerald-400" id="trim-badge">
+                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                            EVEN KEEL
+                        </div>
+                    </div>
+                </div>
+
+                <div id="warning-box" class="absolute top-20 left-1/2 -translate-x-1/2 flex items-center gap-4 bg-red-500/90 backdrop-blur text-white px-8 py-4 rounded-full shadow-xl hidden transition-all scale-95 opacity-0 z-50">
+                    <div class="bg-white/20 p-2 rounded-full animate-pulse">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                    </div>
+                    <div>
+                        <div class="font-bold text-sm tracking-widest">PHYSICS ALERT</div>
+                        <div class="text-sm font-mono" id="warning-text">Warning</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-slate-900 rounded-2xl border border-slate-700 flex flex-col shadow-2xl overflow-hidden">
+            <div class="p-5 border-b border-slate-800 bg-slate-900">
+                <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Timeline & Sequence</h3>
+                <div class="text-[10px] text-emerald-500 font-mono font-bold">Quay Elevation Patched</div>
+            </div>
+            
+            <div class="flex-1 overflow-y-auto custom-scrollbar p-3 space-y-1.5" id="button-list"></div>
+
+            <div class="p-5 bg-slate-800/50 border-t border-slate-800 backdrop-blur">
+                <div class="text-[10px] font-bold text-blue-400 uppercase tracking-widest mb-2">Log</div>
+                <p class="text-xs text-slate-300 leading-relaxed min-h-[40px] font-medium" id="desc-display">Ready.</p>
+                <div class="mt-3 pt-3 border-t border-slate-700/50 flex justify-between text-[10px] font-mono text-slate-500">
+                    <span>Ballast: <span id="ballast-val" class="text-white">-</span></span>
+                    <span>Tugs: <span id="tug-status" class="text-slate-300">STANDBY</span></span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- CONFIGURATION ---
+        const PX_PER_M = 40.0; 
+        const AP_OFFSET = 100; 
+        const SUPPORT_LEN_PX = 180; 
+
+        function mapX_CAD(metersFromAP) {
+            if (metersFromAP === null) return 1500; 
+            return AP_OFFSET + (metersFromAP * 15.0); 
+        }
+
+        // --- DATA ---
+        const stages = [
+            { 
+                id: "st1", label: "Stage 1: Start", day: "D-1",
+                tr1: null, tr2: null, 
+                dfwd: 2.00, daft: 2.00, bal: 0, tug: false,
+                desc: "D-1: Arrival. Quay Level Aligned with Deck." 
+            },
+            { 
+                id: "st2", label: "Stage 2: TR1 Entry", day: "D-1",
+                tr1: 70.0, tr2: null, 
+                dfwd: 2.30, daft: 1.70, bal: 0, tug: false,
+                desc: "D-1: TR1 on Ramp. Smooth Entry." 
+            },
+            { 
+                id: "st3", label: "Stage 3: TR1 Mid", day: "D-1",
+                tr1: 45.0, tr2: null, 
+                dfwd: 2.20, daft: 1.80, bal: 0, tug: false,
+                desc: "D-1: TR1 Moving Aft." 
+            },
+            { 
+                id: "st4", label: "Stage 4: TR1 Secured", day: "D-1",
+                tr1: 22.35, tr2: null, 
+                dfwd: 2.00, daft: 2.00, bal: 0, tug: false,
+                desc: "D-1: TR1 Secured. Even Keel." 
+            },
+            { 
+                id: "st5", label: "Stage 5: Pre-Ballast", day: "D-1",
+                tr1: 22.35, tr2: null, 
+                dfwd: 0.80, daft: 3.20, bal: 250, tug: false,
+                desc: "⚠️ D-1 BALLASTING: High Stern Draft (3.2m) Prepared." 
+            },
+            { 
+                id: "st6a", label: "Stage 6A: TR2 Entry", day: "D-Day",
+                tr1: 22.35, tr2: 65.0, 
+                dfwd: 2.50, daft: 1.50, bal: 250, tug: true,
+                desc: "D-Day: TR2 Enters. Countering moment." 
+            },
+            { 
+                id: "st6c", label: "Stage 6C: Final Stow", day: "D-Day",
+                tr1: 22.35, tr2: 39.0, 
+                dfwd: 1.50, daft: 2.50, bal: 250, tug: true,
+                desc: "D-Day: Final Stowage." 
+            },
+            { 
+                id: "st7", label: "Stage 7: Departure", day: "D-Day",
+                tr1: 22.35, tr2: 39.0, 
+                dfwd: 2.00, daft: 2.00, bal: 250, tug: true,
+                desc: "Departure." 
+            }
+        ];
+
+        const els = {
+            ship: document.getElementById('ship-group'),
+            tr1: document.getElementById('tr1'),
+            tr2: document.getElementById('tr2'),
+            tug: document.getElementById('tug-assist'),
+            lsLine: document.getElementById('ls-line'),
+            lsP1: document.getElementById('ls-p1'),
+            lsP2: document.getElementById('ls-p2'),
+            lsGroup: document.getElementById('linkspan-dynamic'),
+            ballastVis: document.getElementById('ballast-visual'),
+            ballastTxt: document.getElementById('ballast-text'),
+            dfwd: document.getElementById('dfwd-display'),
+            daft: document.getElementById('daft-display'),
+            trim: document.getElementById('trim-display'),
+            trimBadge: document.getElementById('trim-badge'),
+            desc: document.getElementById('desc-display'),
+            ballast: document.getElementById('ballast-val'),
+            tugStatus: document.getElementById('tug-status'),
+            list: document.getElementById('button-list'),
+            warning: document.getElementById('warning-box'),
+            wText: document.getElementById('warning-text'),
+            dayInd: document.getElementById('day-indicator'),
+            gapDims: document.getElementById('cad-gap-dims'),
+            dimLine: document.getElementById('dim-line'),
+            dimText: document.getElementById('dim-text'),
+            dimExt1: document.getElementById('dim-ext1'),
+            dimExt2: document.getElementById('dim-ext2')
+        };
+
+        // FIXED PHYSICS CONSTANTS
+        const PHYSICS = {
+            waterY: 400, 
+            pxScale: 40, 
+            hullDepthM: 3.65, 
+            shipCenterX: 580, 
+            shipCenterY: 100, 
+            bowXLocal: 1060, 
+            quayX: 1250,
+            quayY: 330 // FIXED: Matched to Ship Deck Level
+        };
+
+        let currentStageIdx = 0;
+        let autoPlayInterval = null;
+
+        function updateLinkspan(targetY, angle) {
+            const rad = angle * (Math.PI / 180);
+            const cos = Math.cos(rad);
+            const sin = Math.sin(rad);
+            const dx = PHYSICS.bowXLocal - PHYSICS.shipCenterX;
+            const dy = 0;
+            const rx = dx * cos - dy * sin;
+            const ry = dx * sin + dy * cos;
+            const worldBowX = PHYSICS.shipCenterX + rx;
+            const worldBowY = PHYSICS.shipCenterY + ry + targetY;
+
+            els.lsP1.setAttribute('cx', worldBowX);
+            els.lsP1.setAttribute('cy', worldBowY);
+            els.lsLine.setAttribute('x1', worldBowX);
+            els.lsLine.setAttribute('y1', worldBowY);
+            els.lsLine.setAttribute('x2', PHYSICS.quayX);
+            els.lsLine.setAttribute('y2', PHYSICS.quayY);
+            els.lsP2.setAttribute('cx', PHYSICS.quayX);
+            els.lsP2.setAttribute('cy', PHYSICS.quayY);
+        }
+
+        function setStage(index) {
+            Array.from(els.list.children).forEach((b, i) => {
+                if (i === index) {
+                    b.className = "w-full text-left px-4 py-3 rounded-xl text-xs font-bold bg-indigo-600 text-white shadow-lg shadow-indigo-900/40 ring-1 ring-indigo-400 transition-all scale-[1.02]";
+                } else {
+                    b.className = "w-full text-left px-4 py-3 rounded-xl text-xs font-medium bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-slate-200 transition-all";
+                }
+            });
+
+            const d = stages[index];
+
+            els.dayInd.innerText = d.day;
+            if (d.day === "D-Day") {
+                els.dayInd.className = "px-4 py-1.5 rounded-full bg-red-900/50 border border-red-500 text-xs font-bold text-red-200 tracking-widest transition-all animate-pulse";
+            } else {
+                els.dayInd.className = "px-4 py-1.5 rounded-full bg-blue-900/50 border border-blue-500 text-xs font-bold text-blue-200 tracking-widest transition-all";
+            }
+
+            if (d.tug) {
+                els.tug.classList.remove('opacity-0');
+                els.tugStatus.innerText = "ACTIVE";
+                els.tugStatus.className = "text-emerald-400 font-bold animate-pulse";
+            } else {
+                els.tug.classList.add('opacity-0');
+                els.tugStatus.innerText = "STANDBY";
+                els.tugStatus.className = "text-slate-500";
+            }
+
+            const meanDraft = (d.dfwd + d.daft) / 2;
+            const freeboard = PHYSICS.hullDepthM - meanDraft;
+            
+            // TargetY calculation logic
+            // Water Y = 400.
+            // Ship Pivot (CenterY) is approx Deck Level.
+            // Deck should be (Freeboard * Scale) above Water.
+            // So Pivot Y should contain an offset to align Hinge to Deck.
+            // Ship Hinge Y (local) = 0. Pivot Y (local) = 100.
+            // This means Hinge is 100px HIGHER than Pivot in local space? No, Hinge is at Y=0, Pivot at Y=100 (Pivot is below deck).
+            // Wait, SVG Y grows downwards. Y=0 is Top (Deck). Y=100 is deeper (Pivot).
+            // So Pivot is 100px BELOW Deck.
+            // We want Deck (Y=0 local) to be at WaterY - (Freeboard*Scale).
+            // Pivot (Y=100 local) should be at WaterY - (Freeboard*Scale) + 100.
+            const targetY = PHYSICS.waterY - (freeboard * PHYSICS.pxScale) - 100; 
+
+            const trimM = d.daft - d.dfwd;
+            const angle = -trimM * 1.5; 
+
+            els.ship.setAttribute('transform', `translate(0, ${targetY}) rotate(${angle}, ${PHYSICS.shipCenterX}, ${PHYSICS.shipCenterY})`);
+
+            if (index === 7) els.lsGroup.style.opacity = "0";
+            else {
+                els.lsGroup.style.opacity = "1";
+                updateLinkspan(targetY, angle);
+            }
+
+            els.tr1.style.opacity = d.tr1 === null ? "0" : "1";
+            els.tr2.style.opacity = d.tr2 === null ? "0" : "1";
+            els.tr1.setAttribute('transform', `translate(${mapX_CAD(d.tr1)}, 0)`);
+            els.tr2.setAttribute('transform', `translate(${mapX_CAD(d.tr2)}, 0)`);
+
+            if (d.bal > 0) {
+                els.ballastVis.setAttribute('height', 45);
+                els.ballastVis.setAttribute('y', 100);
+                els.ballastTxt.setAttribute('opacity', 1);
+            } else {
+                els.ballastVis.setAttribute('height', 0);
+                els.ballastVis.setAttribute('y', 145);
+                els.ballastTxt.setAttribute('opacity', 0);
+            }
+
+            if (index === 6 || index === 7) {
+                const tr1X = mapX_CAD(d.tr1);
+                const tr2X = mapX_CAD(d.tr2);
+                const len = 180; 
+                const tr1End = tr1X + len/2;
+                const tr2Start = tr2X - len/2;
+                const mid = (tr1End + tr2Start) / 2;
+
+                els.dimLine.setAttribute('x1', tr1End);
+                els.dimLine.setAttribute('x2', tr2Start);
+                els.dimText.setAttribute('x', mid);
+                els.dimExt1.setAttribute('x1', tr1End);
+                els.dimExt1.setAttribute('x2', tr1End);
+                els.dimExt2.setAttribute('x1', tr2Start);
+                els.dimExt2.setAttribute('x2', tr2Start);
+                els.gapDims.classList.remove('opacity-0');
+            } else {
+                els.gapDims.classList.add('opacity-0');
+            }
+
+            els.dfwd.innerText = d.dfwd.toFixed(2);
+            els.daft.innerText = d.daft.toFixed(2);
+            els.trim.innerText = (trimM > 0 ? "+" : "") + Math.abs(trimM).toFixed(2) + " m";
+            els.desc.innerText = d.desc;
+            els.ballast.innerText = d.ballast.toLocaleString() + " t";
+
+            if (Math.abs(trimM) < 0.1) {
+                els.trimBadge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> EVEN KEEL`;
+                els.trimBadge.className = "inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-emerald-900/30 text-[10px] font-bold text-emerald-400 border border-emerald-800";
+            } else {
+                const label = trimM > 0 ? "TRIM AFT" : "TRIM FWD";
+                const color = Math.abs(trimM) > 2 ? "red" : "yellow";
+                els.trimBadge.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-${color}-500 animate-pulse"></span> ${label}`;
+                els.trimBadge.className = `inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-${color}-900/30 text-[10px] font-bold text-${color}-400 border border-${color}-800`;
+            }
+
+            if (d.daft > 3.0 || d.dfwd > 3.0) {
+                els.warning.style.display = "flex";
+                setTimeout(() => els.warning.style.opacity = "1", 50);
+                const cause = d.daft > 3.0 ? "Deep Stern Draft" : "Deep Bow Draft";
+                els.wText.innerText = `${cause} (${Math.max(d.daft, d.dfwd)}m)`;
+            } else {
+                els.warning.style.opacity = "0";
+                setTimeout(() => els.warning.style.display = "none", 300);
+            }
+        }
+
+        stages.forEach((s, i) => {
+            const btn = document.createElement('button');
+            btn.innerHTML = `<span>${s.label}</span>`;
+            btn.onclick = () => {
+                if(autoPlayInterval) toggleAutoPlay(); 
+                setStage(i);
+            };
+            els.list.appendChild(btn);
+        });
+        
+        function toggleAutoPlay() {
+            const btn = document.getElementById('play-btn');
+            if (autoPlayInterval) {
+                clearInterval(autoPlayInterval);
+                autoPlayInterval = null;
+                btn.innerHTML = "AUTO PLAY";
+                btn.classList.remove('bg-red-600', 'border-red-500');
+                btn.classList.add('bg-emerald-600', 'border-emerald-500');
+            } else {
+                let nextIdx = currentStageIdx;
+                autoPlayInterval = setInterval(() => {
+                    nextIdx = (nextIdx + 1) % stages.length;
+                    setStage(nextIdx);
+                }, 3000); 
+                btn.innerHTML = "STOP";
+                btn.classList.remove('bg-emerald-600', 'border-emerald-500');
+                btn.classList.add('bg-red-600', 'border-red-500');
+            }
+        }
+
+        setStage(0);
+
+    </script>
+</body>
+</html>

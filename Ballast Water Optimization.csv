@@ -1,0 +1,44 @@
+Stage	W_stage_t	x_stage_m	TM (t·m)	Trim_cm	FWD_precise_m	AFT_precise_m	ΔTM_cm_tm	Lever_arm_m	Ballast_t_calc	Ballast_time_h_calc	Ballast_t	Ballast_time_h	Trim_Check	Dfwd_m	Daft_m	Trim_target_stage_cm	FWD_Height_m	AFT_Height_m
+Stage 1	0.00	0.00	0.00	0.00	2.00	2.00	0.00	19.00	0.00	0.00	0.00	0.00	OK	2.00	2.00	0.00	1.00	1.00
+Stage 2	81.20	-10.00	-893.20	-26.28	2.08	1.82	2,386.84	19.00	125.62	125.62	104.46	104.46	OK	1.87	2.13	-96.50	1.13	0.87
+Stage 3	137.44	-6.85	-1,078.90	-31.74	2.10	1.78	2,201.13	19.00	115.85	115.85	126.17	126.17	OK	1.84	2.16	-96.50	1.16	0.84
+Stage 4	271.20	-3.85	-1,315.32	-38.70	2.12	1.73	1,964.72	19.00	103.41	103.41	153.82	153.82	OK	1.81	2.19	-96.50	1.19	0.81
+Stage 5	0.00	22.35	0.00	0.00	2.00	2.00	3,044.82	19.00	160.25	160.25	0.00	0.00	OK	2.00	2.00	-89.58	1.00	1.00
+Stage 5_PreBallast	542.40	-25.15	-14,183.76	-417.29	3.25	-0.92	-22,341.36	19.00	-1,175.86	-1,175.86	1,658.74	1,658.74	EXCESSIVE	-0.09	4.09	240.00	3.09	-1.09
+Stage 6A_Critical (Opt C)	1,084.80	25.00	26,035.20	765.97	-0.30	7.36	26,035.20	19.00	1,370.27	1,370.27	3,044.72	3,044.72	EXCESSIVE	5.83	-1.83	0.00	-2.83	4.83
+Stage 6C	1,084.80	9.85	9,600.48	282.45	1.15	3.98	12,880.52	19.00	677.92	677.92	1,122.74	1,122.74	EXCESSIVE	3.41	0.59	-96.50	-0.41	2.41
+Stage 7	0.00	0.00	0.00	0.00	2.00	2.00	0.00	19.00	0.00	0.00	0.00	0.00	OK	2.00	2.00	0.00	1.00	1.00
+Stage 6C_TotalMassOpt	868.83	9.85	8,557.98	251.78	0.74	3.26	11,838.01	19.00	623.05	623.05			EXCESSIVE	0.74	3.26	-96.50	1.26	0.00
+Stage	W_stage_t	x_stage_m	GM(m)	Fwd Draft(m)	vs 2.70m	De-ballast Qty(t)	Timing	Phys_Freeboard_m	Clearance_Check	GM_calc	GM_Check	Prop Imm(%)	Vent_Time_h
+Stage 1	0.00	0.00	3.15	2.00	OK	0.00		-1.00	<0.28m CHECK	3.15	OK	-8.00	-
+Stage 2	81.20	-10.00	3.15	1.87	OK	125.62		-0.87	<0.28m CHECK	3.15	OK	2.51	2.79
+Stage 3	137.44	-6.85	3.15	1.84	OK	115.85		-0.84	<0.28m CHECK	3.15	OK	4.70	2.57
+Stage 4	271.20	-3.85	3.15	1.81	OK	103.41		-0.81	<0.28m CHECK	3.15	OK	7.48	2.30
+Stage 5	0.00	22.35	3.15	2.00	OK	160.25		-1.00	<0.28m CHECK	3.15	OK	-8.00	3.56
+Stage 5_PreBallast	542.40	-25.15	3.15	-0.09	OK	-1,175.86		1.09	OK	3.15	OK	158.92	-
+Stage 6A_Critical (Opt C)	1,084.80	25.00	3.15	5.83	NG	1,370.27		-4.83	<0.28m CHECK	3.15	OK	-314.39	30.45
+Stage 6C	1,084.80	9.85	3.15	3.41	NG	677.92		-2.41	<0.28m CHECK	3.15	OK	-120.98	15.06
+Stage 7	0.00	0.00	3.15	2.00	OK	0.00		-1.00	<0.28m CHECK	3.15	OK	-8.00	-
+Stage 6C_TotalMassOpt	868.83	9.85	3.15	0.74	OK	623.05		0.26	<0.28m CHECK	3.15	OK	92.71	13.85
+Stage	Share_Load_t	Share_Check	Hinge_Rx_t	Rx_Check	Deck_Press_t/m²	Press_Check	Load_Case_B_t	Load_Case_C_t	ΔTM_needed_cm·tm	Ballast_req_t	Ballast_gap_t	Time_Add_h
+Stage 1			45.00	OK					0.00	0.00	0.00	0.00
+Stage 2			45.00	OK					2,386.84	125.62	21.16	21.16
+Stage 3			45.00	OK					2,201.13	115.85	-10.32	-10.32
+Stage 4			45.00	OK					1,964.72	103.41	-50.41	-50.41
+Stage 5			45.00	OK					3,044.82	160.25	160.25	160.25
+Stage 5_PreBallast			45.00	OK					22,341.36	-1,175.86	-2,834.60	-2,834.60
+Stage 6A_Critical (Opt C)			45.00	OK					26,035.20	1,370.27	-1,674.45	-1,674.45
+Stage 6C			45.00	OK					12,880.52	677.92	-444.82	-444.82
+Stage 7			45.00	OK					0.00	0.00	0.00	0.00
+Stage 6C_TotalMassOpt			45.00	OK					11,838.01	623.05	623.05	623.05
+Stage	Heel_deg	GM_eff_m	Ramp_Angle_deg	Ramp_Angle_Check	Pin_Stress_N/mm²	Von_Mises_Check	Required_Tide_m	Tide_OK
+Stage 1			-9.71	OK	0.94	OK	1.30	OK
+Stage 2	17.64	3.15	-8.79	OK	0.94	OK	1.17	OK
+Stage 3	32.37	3.15	-8.60	OK	0.94	OK	1.14	OK
+Stage 4	71.55	3.15	-8.36	OK	0.94	OK	1.11	OK
+Stage 5	0.00	3.15	-9.71	OK	0.94	OK	1.30	OK
+Stage 5_PreBallast	-12.59	3.15	4.74	OK	0.94	OK	0.00	OK
+Stage 6A_Critical (Opt C)	21.60	3.15	-39.06	OK	0.94	OK	5.13	OK
+Stage 6C	43.66	3.15	-19.81	OK	0.94	OK	2.71	OK
+Stage 7			-9.71	OK	0.94	OK	1.30	OK
+Stage 6C_TotalMassOpt	38.05	3.15	-0.97	OK	0.94	OK	0.00	OK

@@ -1,0 +1,65 @@
+{
+  "analysis_time": "2025-11-05T19:16:41.838112",
+  "parameters": {
+    "L_ramp": 12,
+    "theta_max": 6,
+    "KminusZ": 3,
+    "min_draft": 1.5,
+    "max_draft": 3.5,
+    "MTC": 33.95,
+    "LCF": 32.41
+  },
+  "tide_data_count": 744,
+  "ok_hours": 108,
+  "optimal_hours": 48,
+  "continuous_windows": 0,
+  "best_window_duration": 0,
+  "stage_recommendations": [
+    {
+      "stage": "Stage 1",
+      "description": "Empty (baseline 1.93/1.93)",
+      "recommended_time": "",
+      "expected_dfwd": 1.93,
+      "expected_daft": 1.93,
+      "expected_angle": 0
+    },
+    {
+      "stage": "Stage 2",
+      "description": "SPMT 1st Entry",
+      "recommended_time": "2025-12-01 11:00:00",
+      "expected_dfwd": 3.1487491768118825,
+      "expected_daft": 3.1487491768118825,
+      "expected_angle": 6.0
+    },
+    {
+      "stage": "Stage 3",
+      "description": "50% on Ramp",
+      "recommended_time": "2025-12-01 19:00:00",
+      "expected_dfwd": 3.0987491768118827,
+      "expected_daft": 3.0987491768118827,
+      "expected_angle": 6.0
+    },
+    {
+      "stage": "Stage 4",
+      "description": "Full on Ramp",
+      "recommended_time": "2025-12-01 22:00:00",
+      "expected_dfwd": 2.6887491768118825,
+      "expected_daft": 2.6887491768118825,
+      "expected_angle": 6.0
+    },
+    {
+      "stage": "Stage 5",
+      "description": "Deck Full Load",
+      "recommended_time": "2025-12-02 19:00:00",
+      "expected_dfwd": 3.4687491768118828,
+      "expected_daft": 3.4687491768118828,
+      "expected_angle": 5.999999999999998
+    }
+  ],
+  "kpi": {
+    "workable_percentage": 14.516129032258066,
+    "optimal_percentage": 6.451612903225806,
+    "high_angle_hours": 744,
+    "high_draft_hours": 432
+  }
+}

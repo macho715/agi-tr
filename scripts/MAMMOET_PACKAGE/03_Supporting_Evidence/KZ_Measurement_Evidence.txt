@@ -1,0 +1,55 @@
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+K-Z DISTANCE MEASUREMENT EVIDENCE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+For: Mammoet RORO Operations
+Vessel: LCT BUSHRA
+Project: HVDC Transformer Transportation
+
+MEASUREMENT DETAILS:
++------------------------------------------------------+
+| Measurement Date: _______________                    |
+| Time (GST):       _______________                    |
+| Location:         Mina Zayed Port, Berth [__]       |
+| Tide at Time:     _______ m (Chart Datum)           |
+| Weather:          _______________                    |
++------------------------------------------------------+
+| Measured K-Z:     _______ m                          |
+| Verification:     _______ m (repeat measurement)    |
+| Difference:       _______ m (should be < 0.05m)     |
++------------------------------------------------------+
+
+MEASUREMENT METHOD:
+1. Vessel positioned parallel to jetty
+2. Measured from jetty deck to linkspan contact point
+3. Corrections applied for:
+   - Jetty elevation above CD: _______ m
+   - Tide height at measurement: _______ m
+   - Vessel trim (if applicable): _______ m
+
+PERSONNEL PRESENT:
+- Surveyor: _______________________
+- LCT Bushra Master: _______________________
+- Mammoet Representative: _______________________
+- Samsung Representative: _______________________
+
+PHOTO ATTACHED:
+□ Overall measurement setup (wide view)
+□ Close-up of contact point with measuring tape/laser
+□ Digital readout of measurement equipment
+
+VERIFICATION STATEMENT:
+The K-Z distance of _______ m has been measured on site and 
+verified. This value has been entered into Calc!D6 of the 
+working Excel file.
+
+Measured by: _______________________
+Verified by: _______________________
+Date: _______________________
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+NOTE: Attach actual measurement photo (min 1, recommended 3) 
+      when submitting this package to Mammoet.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    

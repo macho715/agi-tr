@@ -1,0 +1,97 @@
+{
+  "vessel": {
+    "name": "LCT BUSHRA AGI TR",
+    "Lpp_m": 60.302,
+    "LCF_m_from_midship": 0.433,
+    "MTC_t_m_per_cm": 34.61,
+    "TPC_t_per_cm": 0.0,
+    "D_vessel_m": 4.85
+  },
+  "stages": [
+    {
+      "name": "Stage 4",
+      "trim_initial_cm": -181.89,
+      "trim_target_cm": -121.0,
+      "MTC_tm_per_cm": 34.61,
+      "pump_rate_tph": 5.0,
+      "x_ballast_m_mid": 12.0,
+      "tanks": [
+        {
+          "tank_id": "VOID3.P",
+          "percent_fill": 80.0,
+          "sg": 1.025
+        },
+        {
+          "tank_id": "VOID3.S",
+          "percent_fill": 80.0,
+          "sg": 1.025
+        },
+        {
+          "tank_id": "VOIDDB2.C",
+          "percent_fill": 60.0,
+          "sg": 1.025
+        }
+      ]
+    },
+    {
+      "name": "Stage 6",
+      "trim_initial_cm": -150.0,
+      "trim_target_cm": -96.5,
+      "MTC_tm_per_cm": 34.61,
+      "pump_rate_tph": 5.0,
+      "x_ballast_m_mid": 12.0,
+      "tanks": [
+        {
+          "tank_id": "VOID3.P",
+          "percent_fill": 70.0,
+          "sg": 1.025
+        },
+        {
+          "tank_id": "VOID3.S",
+          "percent_fill": 70.0,
+          "sg": 1.025
+        },
+        {
+          "tank_id": "FWCARGO1.P",
+          "percent_fill": 50.0,
+          "sg": 1.0
+        },
+        {
+          "tank_id": "FWCARGO1.S",
+          "percent_fill": 50.0,
+          "sg": 1.0
+        }
+      ]
+    },
+    {
+      "name": "Stage 7",
+      "trim_initial_cm": -120.0,
+      "trim_target_cm": -84.34,
+      "MTC_tm_per_cm": 34.61,
+      "pump_rate_tph": 5.0,
+      "x_ballast_m_mid": 12.0,
+      "tanks": [
+        {
+          "tank_id": "VOID3.P",
+          "percent_fill": 60.0,
+          "sg": 1.025
+        },
+        {
+          "tank_id": "VOID3.S",
+          "percent_fill": 60.0,
+          "sg": 1.025
+        },
+        {
+          "tank_id": "FWCARGO2.P",
+          "percent_fill": 40.0,
+          "sg": 1.0
+        },
+        {
+          "tank_id": "FWCARGO2.S",
+          "percent_fill": 40.0,
+          "sg": 1.0
+        }
+      ]
+    }
+  ]
+}

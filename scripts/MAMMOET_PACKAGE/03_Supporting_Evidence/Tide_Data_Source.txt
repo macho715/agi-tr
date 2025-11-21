@@ -1,0 +1,51 @@
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+TIDE DATA SOURCE DOCUMENTATION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+For: Mammoet RORO Operations
+Project: HVDC Transformer Transportation
+Period: December 2025
+
+OFFICIAL SOURCE:
+□ Abu Dhabi Ports Authority (AD Ports)
+   Website: https://www.adports.ae
+   
+□ ADNOC Marine & Offshore Services
+   Contact: [_______________]
+   
+□ Other Official Source: _______________
+
+SOURCE DETAILS:
++------------------------------------------------------+
+| Document/Table Name: _______________                 |
+| Publication Date:    _______________                 |
+| Reference Number:    _______________                 |
+| Datum:               Chart Datum (CD)                |
+| Location:            Mina Zayed Port                 |
+| Validity:            December 2025                   |
++------------------------------------------------------+
+
+DATA CHARACTERISTICS:
+- Temporal Resolution: Hourly predictions
+- Type: Predicted (astronomical tide)
+- Format: Excel spreadsheet / PDF table
+- Units: Meters above Chart Datum
+
+VERIFICATION:
+Data reviewed and approved by:
+Name: _______________________
+Position: _______________________
+Company: Samsung C&T / Mammoet
+Signature: _______________________
+Date: _______________________
+
+ATTACHMENT:
+□ Screenshot or PDF of original tide table
+□ Excel file with tide data (if available)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+NOTE: Attach screenshot or copy of the official tide table 
+      showing the data source clearly.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    

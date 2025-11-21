@@ -1,0 +1,336 @@
+# -*- coding: utf-8 -*-
+"""
+LCT BUSHRA — RORO FWD/AFT Height Report PDF 생성
+Mammoet DWG 업데이트용 제출 자료
+"""
+
+from reportlab.lib.pagesizes import letter, A4
+from reportlab.lib.units import inch, cm
+from reportlab.lib import colors
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image, PageBreak
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+from openpyxl import load_workbook
+import os
+from datetime import datetime
+
+# 한글 폰트 등록 (필요 시)
+# try:
+#     pdfmetrics.registerFont(TTFont('NanumGothic', 'NanumGothic.ttf'))
+# except:
+#     pass
+
+
+def load_height_data(excel_path):
+    """Excel에서 Stage별 높이 데이터 읽기"""
+    try:
+        wb = load_workbook(excel_path)
+        if "RoRo_Height_Report" not in wb.sheetnames:
+            print(f"Warning: RoRo_Height_Report sheet not found")
+            return None
+
+        ws = wb["RoRo_Height_Report"]
+        stages = []
+
+        # 헤더는 12행, 데이터는 13행부터
+        for row in range(13, 18):  # 5개 스테이지
+            stage = ws.cell(row=row, column=1).value
+            if stage:
+                stages.append({
+                    "stage": stage,
+                    "desc": ws.cell(row=row, column=2).value or "",
+                    "displacement": ws.cell(row=row, column=3).value or 0,
+                    "mean_draft": ws.cell(row=row, column=4).value or 0,
+                    "trim": ws.cell(row=row, column=5).value or 0,
+                    "fwd_draft": ws.cell(row=row, column=6).value or 0,
+                    "aft_draft": ws.cell(row=row, column=7).value or 0,
+                    "tide": ws.cell(row=row, column=8).value or 0.5,
+                    "depth": ws.cell(row=row, column=9).value or 3.65,  # LCT Bushra Moulded Depth: 3.65m (verified)
+                    "fwd_height": ws.cell(row=row, column=10).value or 0,
+                    "aft_height": ws.cell(row=row, column=11).value or 0,
+                    "notes": ws.cell(row=row, column=12).value or "",
+                })
+
+        # 물리적 상수
+        constants = {
+            "A_wp": ws.cell(row=5, column=2).value or 749.12,
+            "rho": ws.cell(row=6, column=2).value or 1.025,
+            "MTC": ws.cell(row=7, column=2).value or 40.72,  # Verified from Stability Book (Draft ~2.50m)
+            "Lightship": ws.cell(row=8, column=2).value or 800,
+            "Deadweight_initial": ws.cell(row=9, column=2).value or 100,
+        }
+
+        wb.close()
+        return stages, constants
+    except Exception as e:
+        print(f"Error loading Excel: {e}")
+        return None, None
+
+
+def create_pdf_report(excel_path, sketch_paths, output_path):
+    """
+    PDF 보고서 생성
+
+    Parameters:
+    - excel_path: Excel 파일 경로
+    - sketch_paths: 스케치 이미지 경로 리스트 (Stage 1, Stage 2)
+    - output_path: 출력 PDF 파일 경로
+    """
+    # 데이터 로드
+    stages, constants = load_height_data(excel_path)
+
+    if not stages:
+        print("Error: No stage data found in Excel")
+        return
+
+    # PDF 문서 생성
+    doc = SimpleDocTemplate(
+        output_path,
+        pagesize=A4,
+        rightMargin=2*cm,
+        leftMargin=2*cm,
+        topMargin=2*cm,
+        bottomMargin=2*cm
+    )
+
+    # 스타일 설정
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle(
+        'CustomTitle',
+        parent=styles['Heading1'],
+        fontSize=18,
+        textColor=colors.HexColor('#1F4E78'),
+        spaceAfter=30,
+        alignment=1,  # Center
+    )
+    heading_style = ParagraphStyle(
+        'CustomHeading',
+        parent=styles['Heading2'],
+        fontSize=14,
+        textColor=colors.HexColor('#1F4E78'),
+        spaceAfter=12,
+    )
+    normal_style = styles['Normal']
+
+    # Story (내용) 리스트
+    story = []
+
+    # 제목
+    story.append(Paragraph("LCT BUSHRA — RORO FWD/AFT HEIGHT REPORT", title_style))
+    story.append(Paragraph("For Mammoet DWG Update", styles['Heading3']))
+    story.append(Spacer(1, 0.3*cm))
+
+    # 날짜
+    story.append(Paragraph(f"<b>Report Date:</b> {datetime.now().strftime('%Y-%m-%d %H:%M')}", normal_style))
+    story.append(Spacer(1, 0.5*cm))
+
+    # 1. Project Information
+    story.append(Paragraph("1. Project Information", heading_style))
+    project_info = [
+        ["Project:", "HVDC Project - Samsung C&T Logistics"],
+        ["Vessel:", "LCT BUSHRA"],
+        ["PDF Reference:", "RoRo Simulation Stowage Plan 2025-11-03"],
+        ["General Notes:", "Note 6: LCT Captain to advise final height at FWD & AFT for all stages"],
+        ["Vessel Dimensions:", "Length: 60.302m (Lpp, Verified), Breadth: 14.60m, Depth: 3.65m (Moulded Depth, verified: RoRo Simulation & Stability Booklet)"],
+        ["Linkspan:", "12m (12000mm)"],
+        ["Purpose:", "DWG Update for Mammoet (Yulia Frolova, #msg-39)"],
+    ]
+
+    project_table = Table(project_info, colWidths=[4*cm, 12*cm])
+    project_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (0, -1), colors.lightgrey),
+        ('TEXTCOLOR', (0, 0), (0, -1), colors.black),
+        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, -1), 10),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+        ('TOPPADDING', (0, 0), (-1, -1), 8),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+    ]))
+    story.append(project_table)
+    story.append(Spacer(1, 0.5*cm))
+
+    # 2. Measurement Parameters
+    story.append(Paragraph("2. Measurement Parameters", heading_style))
+    param_info = [
+        ["Parameter", "Value", "Unit", "Notes"],
+        ["KminusZ (K-Z)", "Site Measurement Required", "m", "⚠️ CRITICAL: Must be measured on site"],
+        ["Vessel Depth (D)", "3.65", "m", "Moulded Depth (verified: RoRo Simulation & Stability Booklet, 5/5 documents match, Keel ~ Deck)"],
+        ["Tide (Chart Datum)", "0.5 (assumed)", "m", "Actual tide data required"],
+        ["L_ramp", "12.0", "m", "Linkspan length (Mammoet)"],
+        ["theta_max", "6.0", "deg", "Max ramp angle (Harbour Master)"],
+    ]
+
+    param_table = Table(param_info, colWidths=[4*cm, 3*cm, 2*cm, 7*cm])
+    param_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1F4E78')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, -1), 10),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+        ('TOPPADDING', (0, 0), (-1, -1), 8),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.lightgrey]),
+    ]))
+    story.append(param_table)
+    story.append(Spacer(1, 0.5*cm))
+
+    # 3. Physical Constants
+    if constants:
+        story.append(Paragraph("3. Physical Constants", heading_style))
+        const_info = [
+            ["Constant", "Value", "Unit"],
+            ["A_wp (Waterplane Area)", f"{constants['A_wp']:.2f}", "m²"],
+            ["ρ (Seawater Density)", f"{constants['rho']:.3f}", "t/m³"],
+            ["MTC (Moment to Change Trim)", f"{constants['MTC']:.2f}", "m·t"],
+            ["Lightship", f"{constants['Lightship']:.0f}", "t"],
+            ["Deadweight_initial", f"{constants['Deadweight_initial']:.0f}", "t"],
+        ]
+
+        const_table = Table(const_info, colWidths=[6*cm, 4*cm, 3*cm])
+        const_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1F4E78')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 10),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+            ('TOPPADDING', (0, 0), (-1, -1), 8),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.lightgrey]),
+        ]))
+        story.append(const_table)
+        story.append(Spacer(1, 0.5*cm))
+
+    # 4. Stage별 Height 테이블
+    story.append(Paragraph("4. Stage-by-Stage Height Analysis", heading_style))
+
+    # 테이블 헤더
+    table_data = [["Stage", "Description", "Δ (t)", "Td (m)", "Trim (m)", "FWD Draft (m)", "AFT Draft (m)", "Tide (m)", "FWD Height (m)", "AFT Height (m)", "Notes"]]
+
+    # 데이터 행
+    for stage in stages:
+        table_data.append([
+            str(stage["stage"]),
+            str(stage["desc"])[:30] + "..." if len(str(stage["desc"])) > 30 else str(stage["desc"]),
+            f"{stage['displacement']:.0f}" if isinstance(stage['displacement'], (int, float)) else str(stage['displacement']),
+            f"{stage['mean_draft']:.2f}" if isinstance(stage['mean_draft'], (int, float)) else str(stage['mean_draft']),
+            f"{stage['trim']:.2f}" if isinstance(stage['trim'], (int, float)) else str(stage['trim']),
+            f"{stage['fwd_draft']:.2f}" if isinstance(stage['fwd_draft'], (int, float)) else str(stage['fwd_draft']),
+            f"{stage['aft_draft']:.2f}" if isinstance(stage['aft_draft'], (int, float)) else str(stage['aft_draft']),
+            f"{stage['tide']:.2f}" if isinstance(stage['tide'], (int, float)) else str(stage['tide']),
+            f"{stage['fwd_height']:.2f}" if isinstance(stage['fwd_height'], (int, float)) else str(stage['fwd_height']),
+            f"{stage['aft_height']:.2f}" if isinstance(stage['aft_height'], (int, float)) else str(stage['aft_height']),
+            str(stage["notes"])[:40] + "..." if len(str(stage["notes"])) > 40 else str(stage["notes"]),
+        ])
+
+    # 테이블 생성 (가로 스크롤 대신 작은 폰트 사용)
+    stage_table = Table(table_data, colWidths=[1.5*cm, 3.5*cm, 1.2*cm, 1.2*cm, 1.2*cm, 1.5*cm, 1.5*cm, 1.2*cm, 1.5*cm, 1.5*cm, 3.5*cm])
+    stage_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1F4E78')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 9),
+        ('FONTSIZE', (0, 1), (-1, -1), 8),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+        ('TOPPADDING', (0, 0), (-1, -1), 6),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.lightgrey]),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+    ]))
+    story.append(stage_table)
+    story.append(Spacer(1, 0.5*cm))
+
+    # 5. Formula Validation
+    story.append(Paragraph("5. Formula Validation", heading_style))
+    formula_text = """
+    <b>Height Calculation Formula:</b><br/>
+    FWD Height = Depth (D) - Draft FWD + Tide<br/>
+    AFT Height = Depth (D) - Draft AFT + Tide<br/>
+    <br/>
+    <b>Where:</b><br/>
+    • Depth (D) = 3.65 m (Moulded Depth, verified: RoRo Simulation & Stability Booklet)<br/>
+    • Draft FWD/AFT = Calculated from displacement and trim<br/>
+    • Tide = Chart Datum tide level (m)<br/>
+    <br/>
+    <b>Reference:</b> RoRo Simulation Stowage Plan 2025-11-03, General Notes 6
+    """
+    story.append(Paragraph(formula_text, normal_style))
+    story.append(Spacer(1, 0.5*cm))
+
+    # 6. 스케치 이미지 삽입
+    if sketch_paths:
+        story.append(Paragraph("6. Vessel Elevation Views", heading_style))
+        for idx, sketch_path in enumerate(sketch_paths):
+            if os.path.exists(sketch_path):
+                stage_name = f"Stage {idx + 1}"
+                story.append(Paragraph(f"<b>{stage_name} Elevation View</b>", normal_style))
+                img = Image(sketch_path, width=15*cm, height=10*cm)
+                story.append(img)
+                story.append(Spacer(1, 0.3*cm))
+            else:
+                story.append(Paragraph(f"<i>Sketch image not found: {sketch_path}</i>", normal_style))
+        story.append(PageBreak())
+
+    # 7. Risk Assessment
+    story.append(Paragraph("7. Risk Assessment", heading_style))
+    risk_text = """
+    <b>Critical Risks:</b><br/>
+    • <b>KminusZ (K-Z) Measurement:</b> Must be measured on site. Incorrect value will invalidate all calculations.<br/>
+    • <b>Tide Variation:</b> Actual tide data required. Low tide scenarios may increase ramp angle beyond limits.<br/>
+    • <b>Trim Control:</b> Pump limitation (10 t/h, #msg-36) may cause delays in ballast adjustment during Stage 2.<br/>
+    • <b>Deck Strength:</b> Verify 10 t/m² deck strength limit (#msg-30) for 217t transformer loading.<br/>
+    <br/>
+    <b>Recommendations:</b><br/>
+    • LCT Captain (Capt. Vargas) to provide final measured heights by 11/06.<br/>
+    • Mammoet to update DWG v2.0 upon receipt of final heights.<br/>
+    • Samsung (Haitham/Minkyu) to coordinate Aries stability review (#msg-37).
+    """
+    story.append(Paragraph(risk_text, normal_style))
+    story.append(Spacer(1, 0.5*cm))
+
+    # 8. Notes
+    story.append(Paragraph("8. Important Notes", heading_style))
+    notes_text = """
+    • This report is based on preliminary calculations and PDF specifications.<br/>
+    • Final heights must be verified by LCT Captain on-site measurements.<br/>
+    • All dimensions are in meters (m) unless otherwise specified.<br/>
+    • PDF Reference: RoRo Simulation Stowage Plan 2025-11-03 (Preliminary Issue).<br/>
+    • Final DWG will be issued by Mammoet upon feedback/approval from LCT Bushra Captain (#msg-39).
+    """
+    story.append(Paragraph(notes_text, normal_style))
+
+    # PDF 생성
+    doc.build(story)
+    print(f"PDF report saved: {output_path}")
+
+
+def main():
+    """메인 실행 함수"""
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    excel_path = os.path.join(script_dir, "..", "output", "LCT_BUSHRA_GateAB_v4_HYBRID_generated.xlsx")
+    output_dir = os.path.join(script_dir, "..", "output")
+
+    # 스케치 이미지 경로
+    sketch_paths = [
+        os.path.join(output_dir, "vessel_sketch_stage_1.png"),
+        os.path.join(output_dir, "vessel_sketch_stage_2.png"),
+    ]
+
+    # 출력 PDF 경로
+    output_path = os.path.join(output_dir, "LCT_BUSHRA_Height_Report.pdf")
+
+    create_pdf_report(excel_path, sketch_paths, output_path)
+
+    print("\n" + "=" * 80)
+    print("PDF report generation completed!")
+    print(f"Output file: {output_path}")
+    print("=" * 80)
+
+
+if __name__ == "__main__":
+    main()
+

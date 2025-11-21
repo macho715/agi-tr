@@ -1,0 +1,83 @@
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+HARBOR MASTER SUBMISSION CHECKLIST
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Vessel: LCT BUSHRA
+Submission Date: ____________________
+Operation Date: ____________________
+
+REQUIRED DOCUMENTS:
+
+01. PDF REPORT (Mandatory)
+    □ LCT_BUSHRA_FWD_AFT_Report.pdf
+    □ Contains first 48 hours of operations
+    □ K-Z value clearly stated
+    □ All parameters verified
+    □ Signatures obtained
+
+02. WORKING EXCEL (Reference)
+    □ LCT_BUSHRA_Calculator_LOCKED.xlsx
+    □ Calc!D6 (K-Z) updated with site measurement
+    □ December_Tide_2025 sheet populated with official data
+    □ All formulas verified (no #DIV/0! or #REF! errors)
+    □ Sheet protection enabled
+
+03. SUPPORTING DOCUMENTS
+    □ K-Z Measurement Record
+      - Measurement date/time: ____________________
+      - Surveyor name: ____________________
+      - Photos attached (min 3): □ Yes  □ No
+    
+    □ Tide Data Source Declaration
+      - Source: ____________________
+      - Date range: ____________________
+      - Official stamp/signature: □ Yes  □ No
+    
+    □ Vessel Documentation
+      - Stability Booklet: □ Attached  □ On file
+      - Certificate of Class: □ Attached  □ On file
+      - Crew List: □ Attached  □ On file
+
+TECHNICAL VERIFICATION:
+
+□ K-Z distance verified on site
+□ Linkspan specifications confirmed (12m length)
+□ Maximum ramp angle ≤ 6° in all calculated scenarios
+□ All "Status" cells in Hourly sheet show "OK" for intended operation window
+□ Trim Check in RORO sheet: No "EXCESSIVE" warnings (or explained if present)
+□ Ballast operations feasible within timeline
+
+OPERATIONAL APPROVAL:
+
+□ Chief Officer review completed
+□ Samsung C&T approval obtained
+□ Harbor Master preliminary review: □ Pass  □ Needs revision
+
+SUBMISSION METHOD:
+□ Email to: ____________________
+□ Physical copy delivered to: ____________________
+□ Online portal: ____________________
+
+SUBMITTED BY:
+Name: ____________________
+Company: Samsung C&T Engineering & Construction
+Position: ____________________
+Contact: ____________________
+Signature: ____________________
+Date: ____________________
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+FOR HARBOR MASTER USE ONLY:
+
+Received: ____________________
+Reviewed by: ____________________
+Approval Status: □ Approved  □ Approved with conditions  □ Rejected
+Conditions/Comments:
+_________________________________________________________________
+_________________________________________________________________
+
+Harbor Master Signature: ____________________
+Date: ____________________
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    

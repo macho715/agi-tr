@@ -1,0 +1,11 @@
+{
+  "vessel": {
+    "name": "LCT BUSHRA AGI TR",
+    "Lpp_m": 0.0,
+    "LCF_m_from_midship": 0.0,
+    "MTC_t_m_per_cm": 0.0,
+    "TPC_t_per_cm": 0.0,
+    "D_vessel_m": 0.0
+  },
+  "stages": []
+}

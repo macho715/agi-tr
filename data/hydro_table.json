@@ -1,0 +1,15 @@
+[
+  {"Disp_t":2580.00,"Tmean_m":1.90,"Trim_m":0.00,"GM_m":3.15,"Draft_FWD":1.90,"Draft_AFT":1.90},
+  {"Disp_t":2800.00,"Tmean_m":2.06,"Trim_m":0.00,"GM_m":2.98,"Draft_FWD":2.06,"Draft_AFT":2.06},
+  {"Disp_t":2991.25,"Tmean_m":2.20,"Trim_m":0.20,"GM_m":2.85,"Draft_FWD":2.10,"Draft_AFT":2.30},
+  {"Disp_t":3100.00,"Tmean_m":2.28,"Trim_m":0.00,"GM_m":2.75,"Draft_FWD":2.28,"Draft_AFT":2.28},
+  {"Disp_t":3208.25,"Tmean_m":3.18,"Trim_m":-0.53,"GM_m":1.68,"Draft_FWD":2.92,"Draft_AFT":3.45},
+  {"Disp_t":3265.25,"Tmean_m":3.00,"Trim_m":0.60,"GM_m":1.88,"Draft_FWD":2.68,"Draft_AFT":3.28},
+  {"Disp_t":3425.25,"Tmean_m":3.00,"Trim_m":0.70,"GM_m":1.85,"Draft_FWD":2.65,"Draft_AFT":3.35},
+  {"Disp_t":3600.00,"Tmean_m":3.15,"Trim_m":0.00,"GM_m":1.78,"Draft_FWD":3.15,"Draft_AFT":3.15},
+  {"Disp_t":3800.00,"Tmean_m":3.32,"Trim_m":0.00,"GM_m":1.72,"Draft_FWD":3.32,"Draft_AFT":3.32},
+  {"Disp_t":3960.00,"Tmean_m":3.46,"Trim_m":0.00,"GM_m":1.67,"Draft_FWD":3.46,"Draft_AFT":3.46},
+  {"Disp_t":4100.00,"Tmean_m":3.58,"Trim_m":0.00,"GM_m":1.62,"Draft_FWD":3.58,"Draft_AFT":3.58},
+  {"Disp_t":4250.00,"Tmean_m":3.72,"Trim_m":0.00,"GM_m":1.55,"Draft_FWD":3.72,"Draft_AFT":3.72}
+]
+

@@ -1,0 +1,64 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Excel files (generated)
+*.xlsx
+~$*.xlsx
+
+# Logs
+logs/
+*.log
+
+# Backups
+backups/
+archive/
+
+# Output files
+output/
+
+# Temporary files
+html_files/
+*.backup
+*.tmp
+*.temp
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Project specific
+[HVDC]AGI TRANSFORMER/
+*.zip
+Untitled-*.ts
+Untitled-*.zip
+

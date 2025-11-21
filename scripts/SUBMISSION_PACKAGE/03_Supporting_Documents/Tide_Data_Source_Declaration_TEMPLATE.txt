@@ -1,0 +1,49 @@
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+TIDE DATA SOURCE DECLARATION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Project: HVDC Transformer Transportation
+Vessel: LCT BUSHRA
+Location: Mina Zayed Port → DAS Island
+Period: December 2025
+
+OFFICIAL TIDE DATA SOURCE:
+□ Abu Dhabi Ports Authority (AD Ports)
+□ ADNOC Marine & Offshore Services
+□ Other: ____________________
+
+Source Details:
+- Document Reference: ____________________
+- Publication Date: ____________________
+- Validity Period: ____________________
+- Datum: Chart Datum (CD) / Other: ____________
+
+DATA CHARACTERISTICS:
+- Temporal Resolution: Hourly / Other: ____________
+- Predicted / Observed: ____________
+- Corrections Applied: Yes □  No □
+  If Yes, specify: ____________________
+
+VERIFICATION:
+- Cross-checked with: ____________________
+- Verified by: ____________________
+- Date: ____________________
+
+ATTACHMENT:
+- Original tide table attached: □ Yes  □ No
+- Format: PDF / Excel / Other: ____________
+
+DECLARATION:
+I hereby declare that the tide data used in the calculation workbook
+(December_Tide_2025 sheet) is sourced from the official source stated
+above and represents the best available prediction for the operational
+period.
+
+Name: ____________________
+Position: ____________________
+Signature: ____________________
+Date: ____________________
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    

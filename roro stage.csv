@@ -1,0 +1,34 @@
+1.Critical Stage Verification: Trim & Draft Status Sequence
+Parameter	Value	Unit	REMARK
+Tmean_baseline	2.00	m	Baseline mean draft
+Tide_ref	2.00	m	Reference tide level
+Trim_target_cm	10.00	cm	Target trim
+MTC	33.99	t·m/cm	Moment to change trim
+LCF	1.00	m	Longitudinal center of flotation
+D_vessel	1.00	m	Vessel depth
+TPC	7.95	t/cm	Tons per centimeter
+pump_rate_effective_tph	1.00	t/h	Effective pump rate
+X_Ballast	20.00	m	Ballast center position
+Lpp	80.00	m	Length between perpendiculars
+
+2. Stage Sequence Table
+Stage	EXPLANATION
+Stage 1	Arrival condition (lightship). Check initial drafts and trim.
+Stage 2	TR1 roll-on start: 1st axle on ramp. Initial trim change (bow down).
+Stage 3	TR1 mid-ramp: cargo COG on ramp. Progressive bow down, within limits.
+Stage 4	TR1 on deck: full weight transferred to vessel deck. Verify deck & ramp condition.
+Stage 5	TR1 secured at Fr.42 (aft). Drafts back to baseline; ready for D-1 pre-ballasting.
+Stage 5_PreBallast	[D-1] Pre-ballast using shore water. Set intentional trim for TR2 bow moment. No major dynamic ballasting during RORO.
+Stage 6A_Critical (Opt C)	[D-day] TR2 ramp entry under fixed pre-ballast condition. Check critical drafts/trim without additional pumping.
+Stage 6C	Final stowage with both TRs secured. Confirm departure stability based on pre-ballast distribution.
+Stage 7	Departure / reference condition after completion of RORO sequence.
+
+3.Ballast Range Table
+Ballast (ton)	Fwd Draft (m)	Freeboard (m)	Aft Draft (m)	Status Assessment
+0 ~ 170	> 3.65	(-) Submerged	< 2.80	DANGER (Deck Submerged)
+180.00	3.64	0.01	2.88	Minimum Limit (Dry Deck)
+200.00	3.60	0.05	2.98	Baseline (Draft Optimized)
+250.00	3.48	0.17	3.22	Safe
+300.00	3.36	0.29	3.46	Recommended (Rec. Min)
+350 ~ 500	< 3.25	> 0.40	3.7 ~ 4.4	Very Safe
+550 ~ 620	< 2.80	> 0.86	> 4.50	Caution (Deep Aft Draft)

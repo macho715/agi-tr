@@ -1,0 +1,58 @@
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+K-Z DISTANCE MEASUREMENT RECORD
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Vessel: LCT BUSHRA
+Location: Mina Zayed Port, Berth [___]
+Date: ________________
+Time (GST): ________________
+
+MEASUREMENT TEAM:
+- Surveyor: ________________
+- Chief Officer: ________________
+- Samsung Representative: ________________
+
+ENVIRONMENTAL CONDITIONS:
+- Tide Level: ________ m (CD)
+- Weather: ________________
+- Sea State: ________________
+
+MEASUREMENT METHOD:
+1. Position vessel parallel to jetty
+2. Measure from jetty deck level to linkspan contact point
+3. Account for:
+   - Jetty elevation above Chart Datum: ________ m
+   - Vessel freeboard at measurement point: ________ m
+   - Tide height at measurement time: ________ m
+
+MEASUREMENTS:
+┌─────────────────────────────────────────────────┐
+│ Measurement Point  │ Reading (m) │ Notes       │
+├────────────────────┼─────────────┼─────────────┤
+│ Jetty Deck Level   │             │             │
+│ Contact Point (K)  │             │             │
+│ Calculated K-Z     │             │ ◄── FINAL   │
+└─────────────────────────────────────────────────┘
+
+VERIFICATION:
+- Repeat measurement: ________ m
+- Difference: ________ m (should be < 0.05m)
+
+PHOTO DOCUMENTATION:
+- Photo 1: Overall view of measurement setup
+- Photo 2: Close-up of contact point
+- Photo 3: Measuring equipment with reading
+- Photos attached: □ Yes  □ No
+
+FINAL K-Z VALUE: ________ m
+
+SIGNATURES:
+Surveyor: ________________  Date: ________
+Chief Officer: ________________  Date: ________
+Harbor Master (if present): ________________  Date: ________
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+IMPORTANT: This value must be entered in Calc!D6 before operations.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    
