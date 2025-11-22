@@ -15,15 +15,60 @@ from datetime import datetime
 import numpy as np
 from scipy.interpolate import RectBivariateSpline
 from bisect import bisect_left
-from typing import Dict, Tuple, Any, List
+from typing import Dict, Tuple, Any, List, NamedTuple
 import math
 from enum import Enum, auto
 import logging
 import shutil
+import csv
 
 # 출력 파일 경로를 스크립트 위치 기준 루트 폴더로 설정
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 OUTPUT_FILE = os.path.join(SCRIPT_DIR, "LCT_BUSHRA_AGI_TR_Final_v3.xlsx")
+
+# ============================================================================
+# GM 2D Grid 로드 (전역 변수)
+# ============================================================================
+# GM 2D Grid JSON 로드 - LCT_BUSHRA_GM_2D_Grid.json 기반
+GM2D_DATA = None
+DISP_GRID = []
+TRIM_GRID = []
+GM_GRID = []
+
+
+def _load_gm2d_grid():
+    """GM 2D Grid JSON 로드 및 전역 변수 설정"""
+    global GM2D_DATA, DISP_GRID, TRIM_GRID, GM_GRID
+
+    # JSON 파일 경로 시도 (기존 _load_json 전략과 동일)
+    json_paths = [
+        os.path.join(SCRIPT_DIR, "data", "LCT_BUSHRA_GM_2D_Grid.json"),
+        os.path.join(SCRIPT_DIR, "LCT_BUSHRA_GM_2D_Grid.json"),
+        os.path.join(os.getcwd(), "data", "LCT_BUSHRA_GM_2D_Grid.json"),
+        os.path.join(os.getcwd(), "LCT_BUSHRA_GM_2D_Grid.json"),
+        r"/mnt/data/LCT_BUSHRA_GM_2D_Grid.json",
+    ]
+
+    for json_path in json_paths:
+        if os.path.exists(json_path):
+            try:
+                with open(json_path, "r", encoding="utf-8") as f:
+                    GM2D_DATA = json.load(f)
+                    DISP_GRID = GM2D_DATA.get("disp", [])
+                    TRIM_GRID = GM2D_DATA.get("trim", [])
+                    GM_GRID = GM2D_DATA.get("gm_grid", [])
+                    print(f"[OK] Loaded GM 2D Grid: {json_path}")
+                    return
+            except Exception as e:
+                print(f"[WARNING] Failed to load GM 2D Grid from {json_path}: {e}")
+                continue
+
+    print("[WARNING] GM 2D Grid JSON not found. Using fallback values.")
+    # Fallback: 빈 그리드 (나중에 gm_2d_bilinear에서 fallback 처리)
+
+
+# 모듈 로드 시 GM 2D Grid 초기화
+_load_gm2d_grid()
 
 # ============================================================================
 # Helper Functions
@@ -92,43 +137,354 @@ def _load_json(filename):
     return None
 
 
-def gm_2d_bilinear(disp, trim_m):
+def gm_2d_bilinear(disp_t: float, trim_m: float) -> float:
     """
-    2D bilinear interpolation for GM calculation.
-    Uses Hydro_Table_2D.json with 7x7 grid (7 displacement × 7 trim values).
-
-    BACKUP: Returns safe minimum GM (1.50m) if calculation fails.
+    Bilinear interpolation on (disp, trim) → GM 2D grid.
+    Uses LCT_BUSHRA_GM_2D_Grid.json with 7x7 grid (7 displacement × 7 trim values).
 
     Args:
-        disp: Displacement (tons)
-        trim_m: Trim in meters
+        disp_t: Displacement (tons)
+        trim_m: Trim in meters (bow down + / stern down - 등 프로젝트 convention에 맞게 사용)
 
     Returns:
         GM value (meters) or 1.50m fallback if data not available
     """
-    data = _load_json("data/Hydro_Table_2D.json")
-    if not data or "disp" not in data or "trim" not in data or "gm_grid" not in data:
-        print(f"[BACKUP] GM data unavailable → using fallback GM=1.50m")
+    # 전역 변수 사용 (모듈 로드 시 초기화됨)
+    global DISP_GRID, TRIM_GRID, GM_GRID
+
+    # Fallback: Grid가 비어있으면 안전한 최소값 반환
+    if not DISP_GRID or not TRIM_GRID or not GM_GRID:
+        print(f"[BACKUP] GM 2D Grid unavailable → using fallback GM=1.50m")
         return 1.50  # Safe minimum GM requirement
 
     try:
-        d = np.array(data["disp"])
-        t = np.array(data["trim"])
-        g = np.array(data["gm_grid"])
+        ds = DISP_GRID
+        ts = TRIM_GRID
+        g = GM_GRID
 
-        # Create 2D bilinear interpolator
-        interp = RectBivariateSpline(d, t, g, kx=1, ky=1)
-        gm_value = float(interp(disp, trim_m)[0][0])
+        # --- 1) disp index 찾기 (clamp + 양구간 인덱스) ---
+        if disp_t <= ds[0]:
+            i0 = i1 = 0
+        elif disp_t >= ds[-1]:
+            i0 = i1 = len(ds) - 1
+        else:
+            k = bisect_left(ds, disp_t) - 1
+            if k < 0:
+                k = 0
+            i0, i1 = k, k + 1
+
+        # --- 2) trim index 찾기 (clamp + 양구간 인덱스) ---
+        if trim_m <= ts[0]:
+            j0 = j1 = 0
+        elif trim_m >= ts[-1]:
+            j0 = j1 = len(ts) - 1
+        else:
+            k = bisect_left(ts, trim_m) - 1
+            if k < 0:
+                k = 0
+            j0, j1 = k, k + 1
+
+        d0, d1 = ds[i0], ds[i1]
+        t0, t1 = ts[j0], ts[j1]
+
+        # --- 3) 보간 비율 (0~1) ---
+        if d1 != d0:
+            td = (disp_t - d0) / (d1 - d0)
+        else:
+            td = 0.0
+
+        if t1 != t0:
+            tt = (trim_m - t0) / (t1 - t0)
+        else:
+            tt = 0.0
+
+        # --- 4) 모서리 GM 값 ---
+        g00 = g[i0][j0]  # (d0, t0)
+        g10 = g[i1][j0]  # (d1, t0)
+        g01 = g[i0][j1]  # (d0, t1)
+        g11 = g[i1][j1]  # (d1, t1)
+
+        # --- 5) bilinear interpolation ---
+        gm = (
+            (1 - td) * (1 - tt) * g00
+            + td * (1 - tt) * g10
+            + (1 - td) * tt * g01
+            + td * tt * g11
+        )
 
         # Sanity check for unrealistic GM values
-        if gm_value < 0 or gm_value > 5.0:
-            print(f"[BACKUP] GM={gm_value:.2f}m unrealistic → fallback GM=1.50m")
+        if gm < 0 or gm > 5.0:
+            print(f"[BACKUP] GM={gm:.2f}m unrealistic → fallback GM=1.50m")
             return 1.50
 
-        return gm_value
+        return float(gm)
     except Exception as e:
         print(f"[BACKUP] GM calculation error: {e} → fallback GM=1.50m")
         return 1.50
+
+
+# ============================================================================
+# Hydro Table 보간 함수
+# ============================================================================
+
+
+def interpolate_tmean_from_disp(disp_t: float, hydro_table: list[dict]) -> float:
+    """
+    Δdisp → Tmean 보간
+
+    Args:
+        disp_t: 배수량 (ton)
+        hydro_table: Hydro table 데이터 (list of dict)
+            각 dict는 "Displacement_t" 또는 "Disp_t"와 "Tmean_m" 키를 가져야 함
+
+    Returns:
+        Tmean (m) - 선형 보간된 평균 흘수
+    """
+    if not hydro_table or len(hydro_table) == 0:
+        print("[WARNING] Hydro table is empty → using fallback Tmean=2.00m")
+        return 2.00  # Fallback
+
+    try:
+        # 키 이름 확인 (다양한 형식 지원)
+        disp_key = None
+        tmean_key = None
+
+        for key in hydro_table[0].keys():
+            if "disp" in key.lower() or "displacement" in key.lower():
+                disp_key = key
+            if "tmean" in key.lower() or "mean" in key.lower():
+                tmean_key = key
+
+        if not disp_key or not tmean_key:
+            print(
+                "[WARNING] Hydro table format not recognized → using fallback Tmean=2.00m"
+            )
+            return 2.00
+
+        # Displacement 및 Tmean 배열 추출
+        disps = [float(row[disp_key]) for row in hydro_table]
+        tmeans = [float(row[tmean_key]) for row in hydro_table]
+
+        # 정렬 확인 (필요시 정렬)
+        if disps != sorted(disps):
+            # 정렬 필요
+            sorted_pairs = sorted(zip(disps, tmeans))
+            disps, tmeans = zip(*sorted_pairs)
+            disps = list(disps)
+            tmeans = list(tmeans)
+
+        # Clamp 및 보간
+        if disp_t <= disps[0]:
+            return tmeans[0]
+        elif disp_t >= disps[-1]:
+            return tmeans[-1]
+
+        # 선형 보간
+        i = bisect_left(disps, disp_t)
+        if i <= 0:
+            return tmeans[0]
+        elif i >= len(disps):
+            return tmeans[-1]
+
+        x0, x1 = disps[i - 1], disps[i]
+        y0, y1 = tmeans[i - 1], tmeans[i]
+
+        if x1 == x0:
+            return y0
+
+        tmean = y0 + (y1 - y0) * (disp_t - x0) / (x1 - x0)
+        return float(tmean)
+    except Exception as e:
+        print(f"[WARNING] Tmean interpolation error: {e} → using fallback Tmean=2.00m")
+        return 2.00
+
+
+# ============================================================================
+# LOAD ITEM BUILDER
+# ============================================================================
+
+
+class LoadItem(NamedTuple):
+    """Stage별 하중 구성 요소"""
+
+    name: str
+    weight_t: float
+    x_from_mid_m: float
+    kind: str  # "TR", "SPMT", "BALLAST", "CONST", "CARGO"
+
+
+# ============================================================================
+# STAGE SOLVER (Hydro/GM 기반)
+# ============================================================================
+
+
+def solve_stage(
+    base_disp_t: float, base_tmean_m: float, loads: List[LoadItem], **params
+) -> Dict[str, Any]:
+    """
+    Calculate Δdisp, Trim, Draft, GM, Height, Check for each Stage.
+    Hydro/GM 데이터는 params 내부 참조.
+
+    Args:
+        base_disp_t: 기본 배수량 (ton) - Stage 1 기준
+        base_tmean_m: 기본 평균 흘수 (m) - Stage 1 기준
+        loads: LoadItem 리스트 (Stage별 하중 구성)
+        **params: 파라미터 딕셔너리
+            - MTC: Moment to change trim (t·m/cm)
+            - LCF: Longitudinal center of flotation from midship (m)
+            - LBP: Length between perpendiculars (m)
+            - hydro_table: Hydro table 데이터 (list of dict)
+            - D_vessel: Vessel depth (m, 기본값 3.65)
+
+    Returns:
+        dict: {
+            "W_stage_t": Stage 추가 중량 (ton),
+            "x_stage_m": Stage LCG (m),
+            "TM_LCF_tm": Trim moment (t·m),
+            "Disp_t": 배수량 (ton),
+            "Tmean_m": 평균 흘수 (m),
+            "Trim_cm": Trim (cm),
+            "Dfwd_m": 선수 흘수 (m),
+            "Daft_m": 선미 흘수 (m),
+            "GM_m": GM (m),
+            "FWD_Height_m": 선수 Freeboard (m),
+            "AFT_Height_m": 선미 Freeboard (m),
+            "Trim_Check": Trim 체크 결과 ("OK" or "EXCESSIVE"),
+            "vs_2.70m": FWD draft 체크 ("OK" or "NG"),
+            "GM_Check": GM 체크 ("OK" or "LOW")
+        }
+    """
+    MTC = params.get("MTC", 34.00)
+    LCF = params.get("LCF", 0.76)
+    LBP = params.get("LBP", 60.302)
+    D_vessel = params.get("D_vessel", 3.65)
+    hydro_table = params.get("hydro_table", [])
+
+    # 1. 중량/모멘트 합산
+    delta_w = sum(ld.weight_t for ld in loads)
+    if abs(delta_w) < 1e-6:
+        x_lcg = 0.0
+    else:
+        x_lcg = sum(ld.weight_t * ld.x_from_mid_m for ld in loads) / delta_w
+    tm = sum(ld.weight_t * (ld.x_from_mid_m - LCF) for ld in loads)
+
+    # 2. Trim 계산
+    trim_cm = tm / MTC if MTC > 0 else 0.0
+    trim_m = trim_cm / 100.0
+
+    # 3. 배수 및 평균흘수
+    disp_stage = base_disp_t + delta_w
+    tmean_stage = interpolate_tmean_from_disp(disp_stage, hydro_table)
+
+    # 4. LCF 기반 Dfwd/Daft (가이드 방식: 직접 계산)
+    halfL = LBP / 2.0
+    dfwd_m = tmean_stage - (trim_m * (halfL - LCF) / LBP)
+    daft_m = tmean_stage + (trim_m * (halfL + LCF) / LBP)
+
+    # 5. GM 계산 (2D grid 보간)
+    gm_m = gm_2d_bilinear(disp_stage, trim_m)
+
+    # 6. Freeboard 계산 (Height = D_vessel - Draft)
+    fwd_height_m = max(0.0, D_vessel - dfwd_m)
+    aft_height_m = max(0.0, D_vessel - daft_m)
+
+    # 7. 안전성 체크
+    trim_check = "OK" if abs(trim_cm) <= 240.0 else "EXCESSIVE"
+    vs_270 = "OK" if dfwd_m <= 2.70 else "NG"
+    gm_check = "OK" if gm_m >= 1.50 else "LOW"
+
+    # 8. 결과 패키징
+    return {
+        "W_stage_t": delta_w,
+        "x_stage_m": x_lcg,
+        "TM_LCF_tm": tm,
+        "Disp_t": disp_stage,
+        "Tmean_m": tmean_stage,
+        "Trim_cm": trim_cm,
+        "Dfwd_m": dfwd_m,
+        "Daft_m": daft_m,
+        "GM_m": gm_m,
+        "FWD_Height_m": fwd_height_m,
+        "AFT_Height_m": aft_height_m,
+        "Trim_Check": trim_check,
+        "vs_2.70m": vs_270,
+        "GM_Check": gm_check,
+    }
+
+
+# ============================================================================
+# PRE-BALLAST OPTIMIZATION
+# ============================================================================
+
+
+def find_preballast_opt(base_disp_t: float, base_tmean_m: float, params: dict) -> float:
+    """
+    Find the minimal pre-ballast (t) satisfying all Stage 5_Pre & Stage 6A safety conditions.
+
+    Args:
+        base_disp_t: 기본 배수량 (ton) - Stage 1 기준
+        base_tmean_m: 기본 평균 흘수 (m) - Stage 1 기준
+        params: 파라미터 딕셔너리
+            - W_TR: Transformer + SPMT 중량 (ton)
+            - FR_TR1_STOW: TR1 최종 stow Frame 번호
+            - FR_TR2_RAMP: TR2 ramp Frame 번호
+            - FR_PREBALLAST: PreBallast Frame 번호 (FWB1/2 중심)
+            - MTC: Moment to change trim (t·m/cm)
+            - LCF: Longitudinal center of flotation from midship (m)
+            - LBP: Length between perpendiculars (m)
+            - hydro_table: Hydro table 데이터 (list of dict)
+            - FWD_DRAFT_LIMIT: Forward draft 제한값 (m, 기본값 2.70)
+            - GM_MIN: 최소 GM 요구값 (m, 기본값 1.50)
+            - W_min: 탐색 시작 중량 (ton, 기본값 100.0)
+            - W_max: 탐색 종료 중량 (ton, 기본값 400.0)
+            - step: 탐색 간격 (ton, 기본값 5.0)
+
+    Returns:
+        최적 pre-ballast 중량 (ton)
+
+    Raises:
+        RuntimeError: 조건을 만족하는 pre-ballast를 찾을 수 없는 경우
+    """
+    W_min = params.get("W_min", 100.0)
+    W_max = params.get("W_max", 400.0)
+    step = params.get("step", 5.0)
+    FWD_LIMIT = params.get("FWD_DRAFT_LIMIT", 2.70)
+    GM_MIN = params.get("GM_MIN", 1.50)
+
+    best = None
+
+    for w_pb in np.arange(W_min, W_max + step, step):
+        # Stage 5_PreBallast 계산
+        loads_5 = build_stage_loads("Stage 5_PreBallast", w_pb, params)
+        state_5 = solve_stage(base_disp_t, base_tmean_m, loads_5, **params)
+
+        # Stage 6A_Critical (Opt C) 계산
+        loads_6a = build_stage_loads("Stage 6A_Critical (Opt C)", w_pb, params)
+        state_6a = solve_stage(base_disp_t, base_tmean_m, loads_6a, **params)
+
+        # 안전 조건 검사
+        # - FWD draft ≤ fwd_limit
+        # - GM ≥ gm_min
+        # - |Trim_cm| ≤ 240
+        if (
+            state_5["Dfwd_m"] <= FWD_LIMIT
+            and state_6a["Dfwd_m"] <= FWD_LIMIT
+            and state_5["GM_m"] >= GM_MIN
+            and state_6a["GM_m"] >= GM_MIN
+            and state_5["Trim_Check"] == "OK"
+            and state_6a["Trim_Check"] == "OK"
+        ):
+            best = w_pb
+            break
+
+    if best is None:
+        raise RuntimeError(
+            f"[ERROR] No feasible pre-ballast found within range [{W_min}, {W_max}] t. "
+            f"Please check safety limits: FWD_DRAFT_LIMIT={FWD_LIMIT}m, GM_MIN={GM_MIN}m"
+        )
+
+    print(f"[INFO] Optimal Pre-ballast = {best:.1f} t satisfies all safety conditions.")
+    return best
 
 
 def calc_draft_with_lcf(
@@ -159,6 +515,135 @@ def calc_draft_with_lcf(
     daft_m = tmean_m + trim_m * r
 
     return dfwd_m, daft_m
+
+
+def build_stage5_loads(preballast_t: float, params: dict) -> List[LoadItem]:
+    """
+    Stage 5_PreBallast 구성 (TR1 + PreBallast)
+
+    Args:
+        preballast_t: Pre-ballast 중량 (ton)
+        params: 파라미터 딕셔너리
+            - W_TR: Transformer + SPMT 중량 (ton)
+            - FR_TR1: TR1 Frame 번호
+            - FR_PB: PreBallast Frame 번호 (FWB1/2 중심)
+
+    Returns:
+        LoadItem 리스트
+    """
+    W_TR = params.get("W_TR", 280.0)
+    FR_TR1 = params.get("FR_TR1", 42.0)
+    FR_PB = params.get("FR_PB", 55.5)  # FWB1/2 중심 Frame
+
+    x_tr1 = fr_to_x(FR_TR1)
+    x_pb = fr_to_x(FR_PB)
+
+    return [
+        LoadItem("TR1+SPMT", W_TR, x_tr1, "CARGO"),
+        LoadItem("PreBallast", preballast_t, x_pb, "BALLAST"),
+    ]
+
+
+def build_stage6a_loads(preballast_t: float, params: dict) -> List[LoadItem]:
+    """
+    Stage 6A 구성 (TR1 + TR2 + 동일 PreBallast)
+
+    Args:
+        preballast_t: Pre-ballast 중량 (ton)
+        params: 파라미터 딕셔너리
+            - W_TR: Transformer + SPMT 중량 (ton)
+            - FR_TR1: TR1 Frame 번호
+            - FR_TR2: TR2 Frame 번호
+            - FR_PB: PreBallast Frame 번호 (FWB1/2 중심)
+
+    Returns:
+        LoadItem 리스트
+    """
+    W_TR = params.get("W_TR", 280.0)
+    FR_TR1 = params.get("FR_TR1", 42.0)
+    FR_TR2 = params.get("FR_TR2", -5.0)
+    FR_PB = params.get("FR_PB", 55.5)  # FWB1/2 중심 Frame
+
+    x_tr1 = fr_to_x(FR_TR1)
+    x_tr2 = fr_to_x(FR_TR2)
+    x_pb = fr_to_x(FR_PB)
+
+    return [
+        LoadItem("TR1+SPMT", W_TR, x_tr1, "CARGO"),
+        LoadItem("TR2+SPMT", W_TR, x_tr2, "CARGO"),
+        LoadItem("PreBallast", preballast_t, x_pb, "BALLAST"),
+    ]
+
+
+def build_stage_loads(
+    stage_name: str, preballast_t: float, params: dict
+) -> List[LoadItem]:
+    """
+    Stage별 LoadItem 리스트 (모든 Stage 지원).
+
+    Args:
+        stage_name: Stage 이름 (Stage 1, Stage 2, ..., Stage 7, Stage 5_PreBallast, Stage 6A_Critical (Opt C), Stage 6C)
+        preballast_t: Pre-ballast 중량 (ton)
+        params: 파라미터 딕셔너리
+            - W_TR: Transformer + SPMT 중량 (ton)
+            - FR_TR1_STOW: TR1 최종 stow Frame 번호
+            - FR_TR1_RAMP_MID: TR1 ramp 중간 Frame 번호
+            - FR_TR1_RAMP_START: TR1 ramp 시작 Frame 번호
+            - FR_TR2_RAMP: TR2 ramp Frame 번호
+            - FR_TR2_STOW: TR2 최종 stow Frame 번호
+            - FR_PREBALLAST: PreBallast Frame 번호 (FWB1/2 중심)
+
+    Returns:
+        LoadItem 리스트
+
+    가정:
+      - Stage 2/3/4: TR1+SPMT만 ramp→deck 이동
+      - Stage 5: TR1 최종 stow. (추가 하중 없음)
+      - Stage 5_Pre: TR1 stow + Pre-ballast
+      - Stage 6A: TR1 stow + TR2 ramp 진입 + Pre-ballast
+      - Stage 6C: 두 TR 모두 stow + Pre-ballast
+      - Stage 7: Cargo off (추가 하중 없음)
+    """
+    W_TR = params.get("W_TR", 280.0)
+    fr_tr1_pos = params.get("FR_TR1_STOW", params.get("FR_TR1", 42.0))
+    fr_tr1_ramp_mid = params.get("FR_TR1_RAMP_MID", 37.00)
+    fr_tr1_ramp_start = params.get("FR_TR1_RAMP_START", 40.15)
+    fr_tr2_ramp = params.get("FR_TR2_RAMP", params.get("FR_TR2", -5.0))
+    fr_tr2_stow = params.get("FR_TR2_STOW", 40.00)
+    fr_pb = params.get("FR_PREBALLAST", params.get("FR_PB", 55.5))
+
+    loads: List[LoadItem] = []
+
+    if stage_name == "Stage 1":
+        return loads
+
+    if stage_name == "Stage 2":
+        # TR1 ramp start
+        loads.append(LoadItem("TR1+SPMT", W_TR, fr_to_x(fr_tr1_ramp_start), "CARGO"))
+    elif stage_name == "Stage 3":
+        # TR1 mid-ramp
+        loads.append(LoadItem("TR1+SPMT", W_TR, fr_to_x(fr_tr1_ramp_mid), "CARGO"))
+    elif stage_name == "Stage 4":
+        # TR1 on deck
+        loads.append(LoadItem("TR1+SPMT", W_TR, fr_to_x(fr_tr1_pos), "CARGO"))
+    elif stage_name == "Stage 5":
+        # TR1 최종 stow (Trim 이벤트는 base에서 이미 포함된 것으로 간주)
+        loads.append(LoadItem("TR1+SPMT", W_TR, fr_to_x(fr_tr1_pos), "CARGO"))
+    elif stage_name == "Stage 5_PreBallast":
+        loads.append(LoadItem("TR1+SPMT", W_TR, fr_to_x(fr_tr1_pos), "CARGO"))
+        loads.append(LoadItem("PreBallast", preballast_t, fr_to_x(fr_pb), "BALLAST"))
+    elif stage_name == "Stage 6A_Critical (Opt C)":
+        loads.append(LoadItem("TR1+SPMT", W_TR, fr_to_x(fr_tr1_pos), "CARGO"))
+        loads.append(LoadItem("TR2+SPMT", W_TR, fr_to_x(fr_tr2_ramp), "CARGO"))
+        loads.append(LoadItem("PreBallast", preballast_t, fr_to_x(fr_pb), "BALLAST"))
+    elif stage_name == "Stage 6C":
+        loads.append(LoadItem("TR1+SPMT", W_TR, fr_to_x(fr_tr1_pos), "CARGO"))
+        loads.append(LoadItem("TR2+SPMT", W_TR, fr_to_x(fr_tr2_stow), "CARGO"))
+        loads.append(LoadItem("PreBallast", preballast_t, fr_to_x(fr_pb), "BALLAST"))
+    elif stage_name == "Stage 7":
+        return loads
+
+    return loads
 
 
 GMGrid = Dict[float, Dict[float, float]]
@@ -1261,9 +1746,77 @@ def build_opt_c_stage():
 
 
 def create_roro_sheet(wb: Workbook):
-    """RORO_Stage_Scenarios 생성 (최적 안전값 240cm 적용 완료)"""
+    """RORO_Stage_Scenarios 생성 (build_stage_loads + solve_stage 기반)"""
     ws = wb.create_sheet("RORO_Stage_Scenarios")
     styles = get_styles()
+
+    # =====================================================================
+    # Pre-ballast 최적화 및 Stage별 계산 (Python 엔진 사용)
+    # =====================================================================
+    # Hydro table 로드
+    hydro_table_data = _load_json("data/hydro_table.json")
+    if not hydro_table_data:
+        print("[WARNING] hydro_table.json not found. Using empty table.")
+        hydro_table_data = []
+
+    # CONFIG (export_stages_to_csv와 동일한 설정)
+    # 주의: build_stage_loads의 기본값과 일치시켜야 함
+    cfg = {
+        "W_TR": 271.20,  # TR+SPMT 등가 중량
+        "FR_TR1_RAMP_START": 40.15,  # Stage 2
+        "FR_TR1_RAMP_MID": 37.00,  # Stage 3
+        "FR_TR1_STOW": 42.0,  # Stage 4/5 (build_stage_loads 기본값과 일치)
+        "FR_TR2_RAMP": -5.0,  # Stage 6A (ramp tip, 선수측)
+        "FR_TR2_STOW": 40.00,  # Stage 6C (최종 stow)
+        "FR_PREBALLAST": 55.50,  # FWB1/2 중심 (선미측)
+    }
+
+    # 선박 고정 파라미터
+    MTC = 34.00
+    LCF = 0.76
+    LBP = 60.302
+    D_vessel = 3.65
+    base_disp_t = 2800.00
+    base_tmean_m = 2.00
+
+    params = {
+        "MTC": MTC,
+        "LCF": LCF,
+        "LBP": LBP,
+        "D_vessel": D_vessel,
+        "hydro_table": hydro_table_data,
+        "FWD_DRAFT_LIMIT": 2.70,
+        "GM_MIN": 1.50,
+    }
+    params.update(cfg)
+
+    # Pre-ballast 최적화
+    try:
+        preballast_opt = find_preballast_opt(base_disp_t, base_tmean_m, params)
+        print(f"[INFO] Optimal Pre-ballast: {preballast_opt:.2f} t")
+    except RuntimeError as e:
+        print(f"[WARNING] Pre-ballast optimization failed: {e}")
+        preballast_opt = 250.0  # Fallback
+        print(f"[INFO] Using fallback pre-ballast: {preballast_opt:.2f} t")
+
+    # Stage별 계산 결과 저장
+    stage_results = {}
+    stages_order = [
+        "Stage 1",
+        "Stage 2",
+        "Stage 3",
+        "Stage 4",
+        "Stage 5",
+        "Stage 5_PreBallast",
+        "Stage 6A_Critical (Opt C)",
+        "Stage 6C",
+        "Stage 7",
+    ]
+
+    for st in stages_order:
+        loads = build_stage_loads(st, preballast_opt, params)
+        res = solve_stage(base_disp_t, base_tmean_m, loads, **params)
+        stage_results[st] = res
 
     # Title
     ws["A1"] = "RORO Stage Scenarios – Option C (Target 240cm Safe Margin)"
@@ -1685,102 +2238,31 @@ def create_roro_sheet(wb: Workbook):
     first_data_row = 19  # header_row가 18이므로 first_data_row는 19
     trim5_row = None
 
-    # ------------------------------------------------------------------
-    # [PL 기반] Stage별 W_stage_t & x_stage_m 정의
-    #  - W_stage_t: 기존 Aries v4.3 Stage 패턴(배수)은 유지
-    #               단, TR 217t → TR+SPMT 271.20t(PL 기준)로 스케일 변경
-    #  - 이 값은 "시뮬레이션/설명용"이며, 최종 안전 판단은
-    #    Aries Stability Booklet 공식 Stage 값 우선.
-    # ------------------------------------------------------------------
-
-    # TR+SPMT 기준 단위 중량 (PL 기준)
-    EFFECTIVE_TR_UNIT_T = 271.20
-
+    # =====================================================================
+    # Stage별 기본 데이터 (build_stage_loads 결과 기반)
+    # =====================================================================
     # Stage 6C Total Mass Opt용 상수
     TOTAL_CARGO_WEIGHT_T = 568.83  # 총 화물 중량 (예시값, 필요시 조정)
-    PREBALLAST_T_TARGET = 300.00  # Pre-ballast 목표 중량 (예시값, 필요시 조정)
+    PREBALLAST_T_TARGET = preballast_opt  # 최적화된 Pre-ballast 사용
 
-    # Stage별 배수 (Aries v4.3 패턴 유지, TR+SPMT 기준으로 스케일)
-    STAGE_MUL = {
-        "Stage 2": 0.2994,  # ≈ 81.24t / 271.20t
-        "Stage 3": 0.5068,  # ≈ 137.47t / 271.20t
-        "Stage 4": 1.0,  # = 271.20t
-        "Stage 5_PreBallast": 2.0,  # = 542.40t
-        "Stage 6A_Critical (Opt C)": 4.0,  # = 1,084.80t
-    }
-
-    # TR+SPMT 기준으로 환산된 Stage별 W (ton)
-    w_stage2 = round(EFFECTIVE_TR_UNIT_T * STAGE_MUL["Stage 2"], 2)  # ≈ 81.24t
-    w_stage3 = round(EFFECTIVE_TR_UNIT_T * STAGE_MUL["Stage 3"], 2)  # ≈ 137.47t
-    w_stage4 = round(EFFECTIVE_TR_UNIT_T * STAGE_MUL["Stage 4"], 2)  # = 271.20t
-    w_stage5_pre = round(
-        EFFECTIVE_TR_UNIT_T * STAGE_MUL["Stage 5_PreBallast"], 2
-    )  # = 542.40t
-    w_stage6 = round(
-        EFFECTIVE_TR_UNIT_T * STAGE_MUL["Stage 6A_Critical (Opt C)"], 2
-    )  # = 1,084.80t
-
-    # Stage별 Fr_stage 값 정의 (757 TCP Tank Plan 기준)
-    # x_stage_m은 fr_to_x(Fr_stage)로 자동 계산
-    stage_fr_data = {
-        # Stage 1: Lightship – 기준점, 추가 중량 없음
-        "Stage 1": {"W": 0.0, "Fr": None, "note": "Empty"},
-        # Stage 2/3/4: TR1 + SPMT가 ramp→deck으로 이동 (PL 기반 중량 반영)
-        # 가정: 기타 강재(steel mat, stool 등)는 Trim 영향이 상대적으로 작다고 보고
-        #       Stage 6C에서만 총중량(TOTAL_CARGO_WEIGHT_T)로 반영.
-        # 현재 x 값으로 역산: x_to_fr(-10.0) ≈ 40.15, x_to_fr(-6.85) ≈ 37.00, x_to_fr(-3.85) ≈ 34.00
-        # 실제 물리적 위치 확인 필요 (ramp entry/mid/end)
-        "Stage 2": {
-            "W": w_stage2,
-            "Fr": 40.15,
-            "note": "SPMT 1st Entry (TR1+SPMT per PL)",
-        },
-        "Stage 3": {
-            "W": w_stage3,
-            "Fr": 37.00,
-            "note": "SPMT Mid-Ramp (TR1+SPMT per PL)",
-        },
-        "Stage 4": {
-            "W": w_stage4,
-            "Fr": 34.00,
-            "note": "Break-even (TR1+SPMT full on deck)",
-        },
-        # Stage 5: TR1만 최종 위치(Fr.42) – 여기서는 Trim용 이벤트 중량 0으로 유지
-        # FWB1/2 Center: (Fr 60.5 + Fr 50.5) / 2 = Fr 55.5
-        "Stage 5": {"W": 0.0, "Fr": 55.5, "note": "Ballast Only (FWB1+2, Fr 48–65)"},
-        # Stage 5_PreBallast: Pre-ballast 완료 상태 (TR1+TR2 등가 × TR+SPMT)
-        #  → 542.40t = 2 × 271.20t, 실제 ballast 분배는 별도 시트에서 계산
-        # 현재 x = fr_to_x(5.0) → Fr = 5.0 (AFT, 확인 필요)
-        "Stage 5_PreBallast": {
-            "W": w_stage5_pre,
-            "Fr": 5.0,
-            "note": "Opt C: TR1 Aft + Forward Ballast (FWB1/2, Fr 48–65, PL-based)",
-        },
-        # Stage 6A: TR2 Ramp Entry – 두 대 TR+SPMT 기준 + Ballast effect를 등가 중량으로 반영
-        #  → 1,084.80t = 4 × 271.20t (기존 868t 패턴을 TR+SPMT 기준으로 확대)
-        #  ⚠ 가정: 실제 ΔDisp와 정확히 일치하지 않을 수 있으며, Trim 경향 확인용.
-        # Forward ballast tanks center (FWB1/2, Fr 48–65): Fr 55.5
-        "Stage 6A_Critical (Opt C)": {
-            "W": w_stage6,
-            "Fr": 55.5,
-            "note": "Opt C: TR2 on Ramp + Forward Ballast (FWB1/2, Fr 48–65, PL-based)",
-        },
-        # Stage 6C: Final Stowage – 동일 등가중량 유지, 위치만 최종 Frame 기준
-        "Stage 6C": {
-            "W": w_stage6,
-            "Fr": 40.0,
-            "note": "Symmetric Final (Both TRs+SPMT, PL-based)",
-        },
-        # Stage 7: Cargo Off – 기준 조건 복귀
-        "Stage 7": {"W": 0.0, "Fr": 30.15, "note": "Cargo Off"},
-    }
-
-    # stage_defaults 딕셔너리로 변환 (Fr_stage 기반으로 x_stage_m 자동 계산)
+    # Stage별 기본 데이터 (solve_stage 결과에서 추출)
     stage_defaults = {}
-    for stage_name, data in stage_fr_data.items():
-        fr_val = data["Fr"]
-        x_val = fr_to_x(fr_val) if fr_val is not None else 0.0
-        stage_defaults[stage_name] = {"W": data["W"], "Fr": fr_val, "x": x_val}
+    for stage_name in stages_order:
+        if stage_name in stage_results:
+            res = stage_results[stage_name]
+            # Fr_stage는 build_stage_loads에서 사용한 위치에서 역산
+            # 또는 단순히 x_stage_m에서 역산
+            x_stage = res["x_stage_m"]
+            fr_stage = x_to_fr(x_stage) if abs(x_stage) > 0.01 else None
+
+            stage_defaults[stage_name] = {
+                "W": res["W_stage_t"],
+                "Fr": fr_stage,
+                "x": x_stage,
+            }
+        else:
+            # Fallback (Stage 1, 7 등)
+            stage_defaults[stage_name] = {"W": 0.0, "Fr": None, "x": 0.0}
 
     for idx, stage_name in enumerate(stages, start=0):
         row = first_data_row + idx
@@ -1790,24 +2272,24 @@ def create_roro_sheet(wb: Workbook):
 
         if stage_name in stage_defaults:
             defaults = stage_defaults[stage_name]
-            ws.cell(row=row, column=2, value=defaults["W"])  # W_stage_t
-            # Fr_stage 컬럼 (column 3)
+            # W_stage_t: Python에서 계산된 값 사용
+            ws.cell(row=row, column=2, value=defaults["W"])
+            # Fr_stage 컬럼 (column 3): Python에서 계산된 값 사용
             if defaults["Fr"] is not None:
-                ws.cell(row=row, column=3, value=defaults["Fr"])
+                ws.cell(row=row, column=3, value=round(defaults["Fr"], 2))
             else:
                 ws.cell(row=row, column=3, value="")  # Stage 1은 Fr 없음
-            # x_stage_m 컬럼 (column 4) - fr_to_x(Fr_stage)로 자동 계산
-            # Excel 수식: fr_to_x는 Frame_x_from_mid_m.json 기반 VLOOKUP 또는 직접 계산
-            # 직접 계산: x = 30.151 - Fr (757 TCP 기준)
-            if defaults["Fr"] is not None:
-                # Excel 수식으로 자동 계산 (Fr_stage 컬럼 참조)
-                ws.cell(
-                    row=row,
-                    column=4,
-                    value=f'=IF(C{row_str}="", "", 30.151 - C{row_str})',
-                )
-            else:
-                ws.cell(row=row, column=4, value=0.0)  # Stage 1은 x=0
+            # x_stage_m 컬럼 (column 4): Python에서 계산된 값 사용 (Excel 수식 대신)
+            ws.cell(row=row, column=4, value=round(defaults["x"], 2))
+        else:
+            # stage_defaults에 없는 경우 기본값 설정
+            print(
+                f"[WARNING] Stage '{stage_name}' not found in stage_defaults, using defaults"
+            )
+            ws.cell(row=row, column=2, value=0.0)  # W_stage_t
+            ws.cell(row=row, column=3, value="")  # Fr_stage
+            ws.cell(row=row, column=4, value=0.0)  # x_stage_m
+
         ws.cell(row=row, column=2).fill = styles["input_fill"]
         ws.cell(row=row, column=2).font = styles["normal_font"]
         ws.cell(row=row, column=2).number_format = number_format
@@ -1830,13 +2312,15 @@ def create_roro_sheet(wb: Workbook):
         )
         ws.cell(row=row, column=6).font = styles["normal_font"]
         ws.cell(row=row, column=6).number_format = number_format
-        # FWD_precise_m (column 7) - v4.0: Trim_m은 F/100 사용 (Trim_cm이 이제 column 6)
-        # 임시 수식, extend_precision_columns에서 LCF 기반 정밀 계산으로 덮어씀
-        ws.cell(row=row, column=7).value = f'=IF(F{row_str}="", "", F{row_str} / 100)'
+        # FWD_precise_m / AFT_precise_m: Trim_cm(F)을 m로 변환 후 전/후 흘수 산출
+        ws.cell(row=row, column=7).value = (
+            f'=IF($A{row_str}="","",$B$6 + (F{row_str}/100)/2)'
+        )
         ws.cell(row=row, column=7).font = styles["normal_font"]
         ws.cell(row=row, column=7).number_format = number_format
-        # AFT_precise_m (column 8) - v4.0: 임시 수식, extend_precision_columns에서 덮어씀
-        ws.cell(row=row, column=8).value = f'=IF(F{row_str}="", "", F{row_str} / 100)'
+        ws.cell(row=row, column=8).value = (
+            f'=IF($A{row_str}="","",$B$6 - (F{row_str}/100)/2)'
+        )
         ws.cell(row=row, column=8).font = styles["normal_font"]
         ws.cell(row=row, column=8).number_format = number_format
 
@@ -1897,14 +2381,12 @@ def create_roro_sheet(wb: Workbook):
         ws.cell(row=row, column=15).value = (
             f'=IF(F{row_str}="", "", IF(ABS(F{row_str}/100) <= ($B$15/50), "OK", "EXCESSIVE"))'
         )
-        # O (15): Dfwd_m - FWD_precise_m 참조 (LCF 기반 정밀 계산 결과 사용)
-        # extend_precision_columns에서 계산된 FWD_precise_m (Column 7 = G) 참조
-        ws.cell(row=row, column=16).value = f'=IF(G{row_str}="", "", G{row_str})'
+        # O (15): Dfwd_m - FWD_precise_m 그대로 참조
+        ws.cell(row=row, column=16).value = f'=IF($A{row_str}="","",G{row_str})'
         ws.cell(row=row, column=16).font = styles["normal_font"]
         ws.cell(row=row, column=16).number_format = number_format
-        # P (16): Daft_m - AFT_precise_m 참조 (LCF 기반 정밀 계산 결과 사용)
-        # extend_precision_columns에서 계산된 AFT_precise_m (Column 8 = H) 참조
-        ws.cell(row=row, column=17).value = f'=IF(H{row_str}="", "", H{row_str})'
+        # P (16): Daft_m - AFT_precise_m 그대로 참조
+        ws.cell(row=row, column=17).value = f'=IF($A{row_str}="","",H{row_str})'
         ws.cell(row=row, column=17).font = styles["normal_font"]
         ws.cell(row=row, column=17).number_format = number_format
         # Q (17): Trim_target_stage_cm - Stage별 타깃, 없으면 전역(B8) 사용
@@ -1957,8 +2439,15 @@ def create_roro_sheet(wb: Workbook):
         mass_opt_row_str = str(mass_opt_row)
 
         # 3) Stage 6C Total Mass (= 화물 + Pre-ballast) 계산
+        # Python 엔진으로 계산: Stage 6C와 동일한 하중 구성이지만, 실제 총 중량 사용
         stage6c_total_mass_t = round(TOTAL_CARGO_WEIGHT_T + PREBALLAST_T_TARGET, 2)
         # 예시: 568.83 + 300.00 = 868.83 t
+
+        # Stage 6C와 동일한 하중 구성으로 계산 (단, 총 중량만 다름)
+        # 실제로는 Stage 6C와 동일한 LCG를 가정
+        stage6c_res = stage_results.get("Stage 6C", {})
+        stage6c_x = stage6c_res.get("x_stage_m", 0.0) if stage6c_res else 0.0
+        stage6c_fr = x_to_fr(stage6c_x) if abs(stage6c_x) > 0.01 else None
 
         # A: Stage 이름
         ws.cell(row=mass_opt_row, column=1, value="Stage 6C_TotalMassOpt")
@@ -1970,16 +2459,22 @@ def create_roro_sheet(wb: Workbook):
         c.number_format = number_format
         c.fill = styles["input_fill"]  # 사용자가 인지하기 쉽도록 입력색 유지
 
-        # C: Fr_stage – 기존 Stage 6C와 동일한 Fr 참조 (Fr_stage 컬럼)
+        # C: Fr_stage – Stage 6C와 동일한 Fr 사용
         c = ws.cell(row=mass_opt_row, column=3)
-        c.value = f"=C{row_6c_str}"  # Stage 6C의 Fr_stage 값 참조
+        if stage6c_fr is not None:
+            c.value = round(stage6c_fr, 2)
+        else:
+            c.value = f"=C{row_6c_str}"  # Fallback: Stage 6C 참조
         c.font = styles["normal_font"]
         c.number_format = number_format
         c.fill = styles["input_fill"]
 
-        # D: x_stage_m – Fr_stage 기반으로 자동 계산 (일반 Stage와 동일)
+        # D: x_stage_m – Stage 6C와 동일한 x 사용
         c = ws.cell(row=mass_opt_row, column=4)
-        c.value = f"=D{row_6c_str}"  # Stage 6C의 x_stage_m 값 참조 (fr_to_x(Fr_stage))
+        if abs(stage6c_x) > 0.01:
+            c.value = round(stage6c_x, 2)
+        else:
+            c.value = f"=D{row_6c_str}"  # Fallback: Stage 6C 참조
         c.font = styles["normal_font"]
         c.number_format = number_format
         c.fill = styles["input_fill"]
@@ -1996,25 +2491,15 @@ def create_roro_sheet(wb: Workbook):
         c.font = styles["normal_font"]
         c.number_format = number_format
 
-        # G: FWD_precise_m - LCF 기반 정밀 Forward Draft (일반 Stage와 동일한 수식)
-        # MD 파일 공식: Dfwd = Tmean - Trim_m * (1 - LCF/LBP)
-        # Tmean = Baseline draft ($B$6), Trim_m = F/100 (Column 6 = Trim_cm)
+        # G: FWD_precise_m - Trim_cm(F)을 m로 변환 후 전흘수 산출
         c = ws.cell(row=mass_opt_row, column=7)
-        c.value = (
-            f'=IF($A{mass_opt_row_str}="", "", '
-            f"$B$6 - (F{mass_opt_row_str}/100) * (0.5 - Calc!$E$41 / Calc!$E$40))"
-        )
+        c.value = f'=IF($A{mass_opt_row_str}="","",$B$6 + (F{mass_opt_row_str}/100)/2)'
         c.font = styles["normal_font"]
         c.number_format = number_format
 
-        # H: AFT_precise_m - LCF 기반 정밀 Aft Draft (일반 Stage와 동일한 수식)
-        # MD 파일 공식: Daft = Tmean + Trim_m * (LCF/LBP)
-        # Tmean = Baseline draft ($B$6), Trim_m = F/100 (Column 6 = Trim_cm)
+        # H: AFT_precise_m - Trim_cm(F)을 m로 변환 후 선미흘수 산출
         c = ws.cell(row=mass_opt_row, column=8)
-        c.value = (
-            f'=IF($A{mass_opt_row_str}="", "", '
-            f"$B$6 + (F{mass_opt_row_str}/100) * (Calc!$E$41 / Calc!$E$40 + 0.5))"
-        )
+        c.value = f'=IF($A{mass_opt_row_str}="","",$B$6 - (F{mass_opt_row_str}/100)/2)'
         c.font = styles["normal_font"]
         c.number_format = number_format
 
@@ -2063,15 +2548,15 @@ def create_roro_sheet(wb: Workbook):
         c.value = f'=IF(F{mass_opt_row_str}="", "", IF(ABS(F{mass_opt_row_str}/100) <= ($B$15/50), "OK", "EXCESSIVE"))'
         c.font = styles["normal_font"]
 
-        # P: Dfwd_m - FWD_precise_m 참조 (LCF 기반 정밀 계산 결과 사용)
+        # P: Dfwd_m - FWD_precise_m 참조
         c = ws.cell(row=mass_opt_row, column=16)
-        c.value = f'=IF(G{mass_opt_row_str}="", "", G{mass_opt_row_str})'
+        c.value = f'=IF($A{mass_opt_row_str}="","",G{mass_opt_row_str})'
         c.font = styles["normal_font"]
         c.number_format = number_format
 
-        # Q: Daft_m - AFT_precise_m 참조 (LCF 기반 정밀 계산 결과 사용)
+        # Q: Daft_m - AFT_precise_m 참조
         c = ws.cell(row=mass_opt_row, column=17)
-        c.value = f'=IF(H{mass_opt_row_str}="", "", H{mass_opt_row_str})'
+        c.value = f'=IF($A{mass_opt_row_str}="","",H{mass_opt_row_str})'
         c.font = styles["normal_font"]
         c.number_format = number_format
 
@@ -2095,15 +2580,17 @@ def create_roro_sheet(wb: Workbook):
         c.number_format = number_format
 
         # Captain Req 컬럼 추가 (U-AA) - extend_roro_captain_req에서 처리하지 않으므로 직접 추가
-        # U (21): GM - Tmean (O와 P의 평균) 기반으로 Hydro_Table에서 조회
+        # U (21): GM - Tmean (P와 Q의 평균) 기반으로 Hydro_Table에서 조회
+        # 수정: O(Trim_Check) 대신 P(Dfwd_m)와 Q(Daft_m)의 평균 사용
         c = ws.cell(row=mass_opt_row, column=21)
-        c.value = f'=IF(O{mass_opt_row_str}="", "", VLOOKUP(AVERAGE(O{mass_opt_row_str},P{mass_opt_row_str}), Hydro_Table!$B:$D, 3, 1))'
+        c.value = f'=IF(OR(P{mass_opt_row_str}="", Q{mass_opt_row_str}=""), "", VLOOKUP(AVERAGE(P{mass_opt_row_str},Q{mass_opt_row_str}), Hydro_Table!$B:$D, 3, 1))'
         c.number_format = number_format
         c.font = styles["normal_font"]
 
         # V (22): Fwd Draft copy
+        # 수정: O(Trim_Check) 대신 P(Dfwd_m) 참조
         c = ws.cell(row=mass_opt_row, column=22)
-        c.value = f"=O{mass_opt_row_str}"
+        c.value = f"=P{mass_opt_row_str}"
         c.number_format = number_format
         c.font = styles["normal_font"]
 
@@ -2223,25 +2710,15 @@ def create_roro_sheet(wb: Workbook):
         c.font = styles["normal_font"]
         c.number_format = number_format
 
-        # G: FWD_precise_m - LCF 기반 정밀 Forward Draft (일반 Stage와 동일한 수식)
-        # MD 파일 공식: Dfwd = Tmean - Trim_m * (1 - LCF/LBP)
-        # Tmean = Baseline draft ($B$6), Trim_m = F/100 (Column 6 = Trim_cm)
+        # G: FWD_precise_m - Trim_cm(F)을 m로 변환 후 전흘수 산출
         c = ws.cell(row=row, column=7)
-        c.value = (
-            f'=IF($A{row_str}="", "", '
-            f"$B$6 - (F{row_str}/100) * (0.5 - Calc!$E$41 / Calc!$E$40))"
-        )
+        c.value = f'=IF($A{row_str}="","",$B$6 + (F{row_str}/100)/2)'
         c.font = styles["normal_font"]
         c.number_format = number_format
 
-        # H: AFT_precise_m - LCF 기반 정밀 Aft Draft (일반 Stage와 동일한 수식)
-        # MD 파일 공식: Daft = Tmean + Trim_m * (LCF/LBP)
-        # Tmean = Baseline draft ($B$6), Trim_m = F/100 (Column 6 = Trim_cm)
+        # H: AFT_precise_m - Trim_cm(F)을 m로 변환 후 선미흘수 산출
         c = ws.cell(row=row, column=8)
-        c.value = (
-            f'=IF($A{row_str}="", "", '
-            f"$B$6 + (F{row_str}/100) * (Calc!$E$41 / Calc!$E$40 + 0.5))"
-        )
+        c.value = f'=IF($A{row_str}="","",$B$6 - (F{row_str}/100)/2)'
         c.font = styles["normal_font"]
         c.number_format = number_format
 
@@ -2290,15 +2767,15 @@ def create_roro_sheet(wb: Workbook):
         c.value = f'=IF(F{row_str}="", "", IF(ABS(F{row_str}/100) <= ($B$15/50), "OK", "EXCESSIVE"))'
         c.font = styles["normal_font"]
 
-        # P: Dfwd_m - FWD_precise_m 참조 (LCF 기반 정밀 계산 결과 사용)
+        # P: Dfwd_m - FWD_precise_m 참조
         c = ws.cell(row=row, column=16)
-        c.value = f'=IF(G{row_str}="", "", G{row_str})'
+        c.value = f'=IF($A{row_str}="","",G{row_str})'
         c.font = styles["normal_font"]
         c.number_format = number_format
 
-        # Q: Daft_m - AFT_precise_m 참조 (LCF 기반 정밀 계산 결과 사용)
+        # Q: Daft_m - AFT_precise_m 참조
         c = ws.cell(row=row, column=17)
-        c.value = f'=IF(H{row_str}="", "", H{row_str})'
+        c.value = f'=IF($A{row_str}="","",H{row_str})'
         c.font = styles["normal_font"]
         c.number_format = number_format
 
@@ -2595,13 +3072,14 @@ def extend_roro_captain_req(ws, first_data_row, num_stages):
         number_format = "#,##0.00"
 
         ws.cell(row=row, column=21).value = (
-            f'=IF(O{row_str}="", "", VLOOKUP(AVERAGE(O{row_str},P{row_str}), Hydro_Table!$B:$D, 3, 1))'
+            f'=IF(OR(P{row_str}="", Q{row_str}=""), "", VLOOKUP(AVERAGE(P{row_str},Q{row_str}), Hydro_Table!$B:$D, 3, 1))'
         )
         ws.cell(row=row, column=21).number_format = number_format
         ws.cell(row=row, column=21).font = styles["normal_font"]
 
         # V (22): Fwd Draft copy - sdsdds.md: Q열 추가로 U(21) → V(22)로 이동
-        ws.cell(row=row, column=22).value = f"=O{row_str}"
+        # 수정: O(Trim_Check) 대신 P(Dfwd_m) 참조
+        ws.cell(row=row, column=22).value = f"=P{row_str}"
         ws.cell(row=row, column=22).number_format = number_format
         ws.cell(row=row, column=22).font = styles["normal_font"]
 
@@ -2969,27 +3447,16 @@ def extend_precision_columns(ws, first_data_row, num_stages):
     for row in range(first_data_row, first_data_row + num_stages):
         row_str = str(row)
 
-        # G (7): FWD_precise_m - LCF 기반 정밀 Forward Draft
-        # MD 파일 공식: Dfwd = Tmean - Trim_m * (1 - LCF/LBP)
-        # Tmean = Baseline draft ($B$6), Trim_m = F/100 (Column 6 = Trim_cm)
-        # Note: MD 파일의 LCF는 F.P. 기준, Calc!$E$41은 LCF_from_mid_m (midship 기준)
-        # 좌표계 변환: LCF_from_FP = LCF_from_mid_m + LBP/2
-        # r = LCF_from_FP / LBP = (LCF_from_mid_m + LBP/2) / LBP = LCF_from_mid_m/LBP + 1/2
-        # F: 1 - r = 1 - (LCF_from_mid_m/LBP + 1/2) = 1/2 - LCF_from_mid_m/LBP
+        # G (7): FWD_precise_m - Trim_cm(F)을 m로 변환 후 전흘수 산출
         ws.cell(row=row, column=7).value = (
-            f'=IF($A{row_str}="", "", '
-            f"$B$6 - (F{row_str}/100) * (0.5 - Calc!$E$41 / Calc!$E$40))"
+            f'=IF($A{row_str}="","",$B$6 + (F{row_str}/100)/2)'
         )
         ws.cell(row=row, column=7).number_format = number_format
         ws.cell(row=row, column=7).font = styles["normal_font"]
 
-        # H (8): AFT_precise_m - LCF 기반 정밀 Aft Draft
-        # MD 파일 공식: Daft = Tmean + Trim_m * (LCF/LBP)
-        # Tmean = Baseline draft ($B$6), Trim_m = F/100 (Column 6 = Trim_cm)
-        # r = LCF_from_FP / LBP = LCF_from_mid_m/LBP + 1/2
+        # H (8): AFT_precise_m - Trim_cm(F)을 m로 변환 후 선미흘수 산출
         ws.cell(row=row, column=8).value = (
-            f'=IF($A{row_str}="", "", '
-            f"$B$6 + (F{row_str}/100) * (Calc!$E$41 / Calc!$E$40 + 0.5))"
+            f'=IF($A{row_str}="","",$B$6 - (F{row_str}/100)/2)'
         )
         ws.cell(row=row, column=8).number_format = number_format
         ws.cell(row=row, column=8).font = styles["normal_font"]
@@ -3415,6 +3882,171 @@ def create_workbook_from_scratch():
 
 
 # ============================================================================
+# CSV Export Function
+# ============================================================================
+
+
+def export_stages_to_csv(output_path: str = None):
+    """
+    Stage별 계산 결과를 CSV로 Export.
+
+    Python → CSV → 엑셀에서 자동 가져오기 플로우:
+    1. Python이 JSON 3개를 읽는다 (Frame_x_from_mid_m.json, hydro_table.json, LCT_BUSHRA_GM_2D_Grid.json)
+    2. find_preballast_opt()가 Stage 5_Pre / Stage 6A에 대해 최소 Pre-ballast를 찾는다
+    3. 찾은 Pre-ballast를 고정시켜서 Stage 1~7에 대해 solve_stage()로 계산
+    4. 결과를 stage_results.csv로 저장
+    → 엑셀 RORO_Stage_Scenarios 시트에서 B열/W, D열/x, Trim, Dfwd, GM 등을 이 CSV를 VLOOKUP/INDEX로 끌어다 쓴다
+
+    Args:
+        output_path: 출력 CSV 파일 경로 (None이면 기본값: stage_results.csv)
+    """
+    if output_path is None:
+        output_path = os.path.join(SCRIPT_DIR, "stage_results.csv")
+
+    # Hydro table 로드
+    hydro_table_data = _load_json("data/hydro_table.json")
+    if not hydro_table_data:
+        print("[WARNING] hydro_table.json not found. Using empty table.")
+        hydro_table_data = []
+
+    # -------------------------------
+    # CONFIG (가정 값 – 필요 시 조정)
+    # -------------------------------
+    # ⚠ 일부 Stage별 위치/중량은 지금 파일에 명시가 없어서 가정 값으로 묶어두고,
+    #    맨 위 CONFIG에서 네가 직접 튜닝할 수 있게 했다.
+    cfg = {
+        # TR+SPMT 등가 중량 (t)
+        "W_TR": 271.20,  # 가정: PL 기준; 필요 시 수정
+        # TR1 위치 (Frame)
+        "FR_TR1_RAMP_START": 40.15,  # Stage 2
+        "FR_TR1_RAMP_MID": 37.00,  # Stage 3
+        "FR_TR1_STOW": 34.00,  # Stage 4/5
+        # TR2 위치 (Frame)
+        "FR_TR2_RAMP": 5.00,  # 가정: 램프 상 위치
+        "FR_TR2_STOW": 40.00,  # 가정: 최종 stow 위치
+        # Pre-ballast 중심 (FWB1/2)
+        "FR_PREBALLAST": 55.50,
+    }
+
+    # 선박 고정 파라미터 (Aries/NAPA 값 기준 – 필요 시 수정)
+    MTC = 34.00  # t·m/cm
+    LCF = 0.76  # m (midship 기준 x)
+    LBP = 60.302  # m
+    D_vessel = 3.65  # m (Vessel depth)
+
+    # Stage 1 기준 Δ, Tmean (hydro_table.json에서 선택)
+    # 가정: Disp 2800t 근처 값 사용
+    base_disp_t = 2800.00
+    base_tmean_m = 2.00
+
+    # solve_stage에 필요한 params
+    params = {
+        "MTC": MTC,
+        "LCF": LCF,
+        "LBP": LBP,
+        "D_vessel": D_vessel,
+        "hydro_table": hydro_table_data,
+        "FWD_DRAFT_LIMIT": 2.70,
+        "GM_MIN": 1.50,
+    }
+    # build_stage_loads에 필요한 파라미터도 추가
+    params.update(cfg)
+
+    # 1) Pre-ballast 탐색
+    # Stage 5_Pre + Stage 6A 모두 FWD≤limit, GM≥gm_min 만족하는 최소 PreBallast 탐색
+    try:
+        preballast_opt = find_preballast_opt(
+            base_disp_t,
+            base_tmean_m,
+            params,
+        )
+        print(f"[INFO] Optimal Pre-ballast: {preballast_opt:.2f} t")
+    except RuntimeError as e:
+        print(f"[ERROR] Pre-ballast optimization failed: {e}")
+        preballast_opt = 250.0  # Fallback value
+        print(f"[INFO] Using fallback pre-ballast: {preballast_opt:.2f} t")
+
+    # 2) Stage 리스트
+    stages_order = [
+        "Stage 1",
+        "Stage 2",
+        "Stage 3",
+        "Stage 4",
+        "Stage 5",
+        "Stage 5_PreBallast",
+        "Stage 6A_Critical (Opt C)",
+        "Stage 6C",
+        "Stage 7",
+    ]
+
+    # 3) Stage별 계산
+    rows = []
+    for st in stages_order:
+        loads = build_stage_loads(st, preballast_opt, params)
+        res = solve_stage(base_disp_t, base_tmean_m, loads, **params)
+
+        # solve_stage()에서 이미 Trim_Check, vs_2.70m, GM_Check 계산됨
+        rows.append(
+            {
+                "Stage": st,
+                "W_stage_t": round(res["W_stage_t"], 2),
+                "x_stage_m": round(res["x_stage_m"], 2),
+                "TM_LCF_tm": round(res["TM_LCF_tm"], 2),
+                "Trim_cm": round(res["Trim_cm"], 2),
+                "Dfwd_m": round(res["Dfwd_m"], 2),
+                "Daft_m": round(res["Daft_m"], 2),
+                "GM(m)": round(res["GM_m"], 2),
+                "Fwd Draft(m)": round(res["Dfwd_m"], 2),
+                "FWD_Height_m": round(res["FWD_Height_m"], 2),
+                "AFT_Height_m": round(res["AFT_Height_m"], 2),
+                "Trim_Check": res["Trim_Check"],
+                "vs_2.70m": res["vs_2.70m"],
+                "GM_Check": res["GM_Check"],
+                "Disp_t": round(res["Disp_t"], 2),
+                "Tmean_m": round(res["Tmean_m"], 2),
+                "PreBallast_t": round(preballast_opt, 2),
+            }
+        )
+
+    # 4) CSV 저장
+    fieldnames = [
+        "Stage",
+        "W_stage_t",
+        "x_stage_m",
+        "TM_LCF_tm",
+        "Trim_cm",
+        "Dfwd_m",
+        "Daft_m",
+        "GM(m)",
+        "Fwd Draft(m)",
+        "FWD_Height_m",
+        "AFT_Height_m",
+        "Trim_Check",
+        "vs_2.70m",
+        "GM_Check",
+        "Disp_t",
+        "Tmean_m",
+        "PreBallast_t",
+    ]
+
+    try:
+        with open(output_path, "w", newline="", encoding="utf-8") as f:
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
+            writer.writeheader()
+            for r in rows:
+                writer.writerow(r)
+
+        print(f"[INFO] Stage results exported to {output_path}")
+        print(f"[INFO] Total stages: {len(rows)}")
+        print(
+            f"[INFO] 엑셀에서 이 CSV를 가져와서 RORO_Stage_Scenarios 시트의 B열/W, D열/x, Trim, Dfwd, GM 등을 VLOOKUP/INDEX로 연결하세요."
+        )
+    except Exception as e:
+        print(f"[ERROR] Failed to export CSV: {e}")
+        raise
+
+
+# ============================================================================
 # Stage Evaluation Functions (wewewewe.md 가이드)
 # ============================================================================
 
@@ -3607,5 +4239,68 @@ if __name__ == "__main__":
                     "LoadCase_used": s["LoadCase_used"],
                 }
             )
+    elif len(sys.argv) > 1 and sys.argv[1] == "preballast":
+        # Pre-ballast 최적화 데모 실행
+        print("\n" + "=" * 80)
+        print("Pre-ballast 최적화 데모 실행")
+        print("=" * 80)
+
+        # Hydro table 로드
+        hydro_table_data = _load_json("data/hydro_table.json")
+        if not hydro_table_data:
+            print("[WARNING] hydro_table.json not found. Using empty table.")
+            hydro_table_data = []
+
+        # 선박 기본 파라미터
+        params = {
+            "W_TR": 280.0,  # Transformer + SPMT
+            "FR_TR1": 42.0,
+            "FR_TR2": -5.0,
+            "FR_PB": 55.5,  # FWB1/2 중심 Frame
+            "LCF": 0.76,
+            "MTC": 34.00,
+            "LBP": 60.302,
+            "FWD_DRAFT_LIMIT": 2.70,
+            "GM_MIN": 1.50,
+            "hydro_table": hydro_table_data,
+        }
+
+        base_disp = 2800.0  # Stage 1 Δ (lightship, 예시값)
+        base_tmean = 2.00
+
+        # GM 2D bilinear 보간 테스트
+        print("\n[TEST] GM 2D bilinear 보간 테스트:")
+        print(f"  GM @ (3600t, 0.0m trim)  = {gm_2d_bilinear(3600, 0.0):.3f} m")
+        print(f"  GM @ (3650t, 0.25m trim) = {gm_2d_bilinear(3650, 0.25):.3f} m")
+
+        # PreBallast 최적값 탐색
+        try:
+            W_PB_OPT = find_preballast_opt(base_disp, base_tmean, params)
+            params["PREBALLAST_OPT_T"] = W_PB_OPT
+
+            # 결과 출력 (Stage 5, 6A)
+            print("\n[RESULT] Stage 계산 결과:")
+            stage5 = solve_stage(
+                base_disp, base_tmean, build_stage5_loads(W_PB_OPT, params), **params
+            )
+            stage6a = solve_stage(
+                base_disp, base_tmean, build_stage6a_loads(W_PB_OPT, params), **params
+            )
+
+            print("\nStage 5_PreBallast →")
+            for key, value in stage5.items():
+                print(f"  {key}: {value:.3f}")
+
+            print("\nStage 6A_Critical →")
+            for key, value in stage6a.items():
+                print(f"  {key}: {value:.3f}")
+        except RuntimeError as e:
+            print(f"\n[ERROR] {e}")
+    elif len(sys.argv) > 1 and sys.argv[1] == "csv":
+        # CSV Export 실행
+        print("\n" + "=" * 80)
+        print("CSV Export 실행")
+        print("=" * 80)
+        export_stages_to_csv()
     else:
         create_workbook_from_scratch()
