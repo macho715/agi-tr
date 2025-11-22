@@ -2493,13 +2493,25 @@ def create_roro_sheet(wb: Workbook):
 
         # G: FWD_precise_m - Trim_cm(F)을 m로 변환 후 전흘수 산출
         c = ws.cell(row=mass_opt_row, column=7)
+<<<<<<< HEAD
         c.value = f'=IF($A{mass_opt_row_str}="","",$B$6 + (F{mass_opt_row_str}/100)/2)'
+=======
+        c.value = (
+            f'=IF($A{mass_opt_row_str}="","",$B$6 + (F{mass_opt_row_str}/100)/2)'
+        )
+>>>>>>> 90941bdde0c30648d5837a53e5004a08d1944770
         c.font = styles["normal_font"]
         c.number_format = number_format
 
         # H: AFT_precise_m - Trim_cm(F)을 m로 변환 후 선미흘수 산출
         c = ws.cell(row=mass_opt_row, column=8)
+<<<<<<< HEAD
         c.value = f'=IF($A{mass_opt_row_str}="","",$B$6 - (F{mass_opt_row_str}/100)/2)'
+=======
+        c.value = (
+            f'=IF($A{mass_opt_row_str}="","",$B$6 - (F{mass_opt_row_str}/100)/2)'
+        )
+>>>>>>> 90941bdde0c30648d5837a53e5004a08d1944770
         c.font = styles["normal_font"]
         c.number_format = number_format
 
